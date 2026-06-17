@@ -117,7 +117,7 @@ h1 { font-size: 2.2rem; margin: 0; }
 .pile-back::after { content: "🐱"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 2.4rem; }
 .draw:hover .pile-back { transform: translateY(-4px); transition: transform .12s; }
 .pile-count { position: absolute; transform: translate(58px, -28px); background: var(--accent); border-radius: 12px; padding: 1px 8px; font-size: .8rem; font-weight: 700; }
-.card-mini { width: 86px; height: 120px; border-radius: var(--card-radius); box-shadow: var(--shadow); }
+.card-mini { width: 86px; height: 120px; border-radius: var(--card-radius); box-shadow: var(--shadow); background: var(--panel-light); display: flex; flex-direction: column; overflow: hidden; }
 .card-mini.empty { background: rgba(255,255,255,.05); border: 2px dashed var(--panel-light); }
 
 .turn-banner { font-size: 1.05rem; font-weight: 600; min-height: 1.4em; text-align: center; }
@@ -143,9 +143,29 @@ h1 { font-size: 2.2rem; margin: 0; }
 }
 .card:hover { transform: translateY(-8px); }
 .card.selected { border-color: var(--accent2); transform: translateY(-12px); }
-.card .card-art { flex: 1; display: grid; place-items: center; font-size: 2.6rem; background: rgba(0,0,0,.18); }
-.card .card-art img { width: 100%; height: 100%; object-fit: cover; }
-.card .card-name { font-size: .62rem; font-weight: 700; text-align: center; padding: 4px 2px; line-height: 1.1; }
+.card-art {
+  flex: 1; position: relative; overflow: hidden;
+  background-size: cover; background-position: center;
+  background-color: rgba(0, 0, 0, .25);
+}
+.card-art .art-overlay { position: absolute; inset: 0; }
+.card-art .art-glyph { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
+.card-art .art-glyph svg { width: 48%; height: 48%; fill: #fff; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .65)); }
+.card-art.cat-art .art-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(to top, rgba(20, 12, 40, .85), transparent); }
+.card-art .paw-badge { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; background: rgba(255, 94, 138, .92); border-radius: 50%; padding: 3px; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.card-art .paw-badge svg { width: 100%; height: 100%; fill: #fff; display: block; }
+.card .card-name { font-size: .62rem; font-weight: 700; text-align: center; padding: 5px 2px; line-height: 1.1; position: relative; z-index: 1; }
+
+/* per-type photo tint (cat shows at top, color/glyph at bottom) */
+.card-art[data-type="EXPLODE"] .art-overlay { background: linear-gradient(to top, rgba(178, 31, 31, .92), rgba(255, 90, 90, .25)); }
+.card-art[data-type="DEFUSE"]  .art-overlay { background: linear-gradient(to top, rgba(42, 157, 111, .92), rgba(94, 224, 168, .25)); }
+.card-art[data-type="NOPE"]    .art-overlay { background: linear-gradient(to top, rgba(212, 69, 42, .92), rgba(255, 143, 107, .25)); }
+.card-art[data-type="ATTACK"]  .art-overlay { background: linear-gradient(to top, rgba(168, 34, 90, .92), rgba(255, 94, 138, .25)); }
+.card-art[data-type="SKIP"]    .art-overlay { background: linear-gradient(to top, rgba(58, 95, 212, .92), rgba(122, 168, 255, .25)); }
+.card-art[data-type="FAVOR"]   .art-overlay { background: linear-gradient(to top, rgba(138, 58, 212, .92), rgba(217, 155, 255, .25)); }
+.card-art[data-type="SHUFFLE"] .art-overlay { background: linear-gradient(to top, rgba(212, 154, 42, .92), rgba(255, 207, 94, .25)); }
+.card-art[data-type="FUTURE"]  .art-overlay { background: linear-gradient(to top, rgba(42, 157, 168, .92), rgba(94, 224, 224, .25)); }
+
 .card[data-type="EXPLODE"] { background: linear-gradient(160deg, #ff5a5a, #b21f1f); }
 .card[data-type="DEFUSE"] { background: linear-gradient(160deg, #5ee0a8, #2a9d6f); }
 .card[data-type="NOPE"] { background: linear-gradient(160deg, #ff8f6b, #d4452a); }

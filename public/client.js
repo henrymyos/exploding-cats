@@ -494,25 +494,55 @@ function renderLog(log) {
 }
 
 /* ---------------- card faces ---------------- */
-function catEmojiFallback() { return '🐱'; }
 
-function artFor(card) {
-  if (card.type === 'CAT') {
-    // try a real photo first; fall back to emoji
-    return `<img src="/assets/cats/${card.cat}.png" alt="" onerror="this.replaceWith(document.createTextNode('🐈'))" />`;
-  }
-  const icons = {
-    EXPLODE: '💥', DEFUSE: '🌿', NOPE: '🙀', ATTACK: '😼',
-    SKIP: '🏃', FAVOR: '🙏', SHUFFLE: '🔀', FUTURE: '🔮',
-  };
-  return icons[card.type] || '🐱';
-}
+// Which cat's photo backs each action card (rotated so every cat shows up).
+const ACTION_ART = {
+  EXPLODE: 'gambit',
+  DEFUSE: 'max',
+  NOPE: 'pepper',
+  ATTACK: 'loki',
+  SKIP: 'genevieve',
+  FAVOR: 'max',
+  SHUFFLE: 'pepper',
+  FUTURE: 'gambit',
+};
+
+// Clean white line/solid icons drawn over the cat photo for each action.
+const GLYPHS = {
+  EXPLODE: '<svg viewBox="0 0 64 64"><polygon points="32,2 39,22 60,16 45,32 60,48 39,42 32,62 25,42 4,48 19,32 4,16 25,22"/></svg>',
+  DEFUSE: '<svg viewBox="0 0 64 64"><path d="M32 58 C32 32 44 14 60 10 C60 38 47 54 32 58 Z"/><path d="M32 58 C32 36 21 20 6 17 C6 41 19 55 32 58 Z" opacity=".75"/></svg>',
+  NOPE: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="7"><circle cx="32" cy="32" r="24"/><line x1="15" y1="15" x2="49" y2="49"/></svg>',
+  ATTACK: '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="15" ry="12"/><circle cx="15" cy="30" r="6.5"/><circle cx="49" cy="30" r="6.5"/><circle cx="24" cy="18" r="6.5"/><circle cx="40" cy="18" r="6.5"/></svg>',
+  SKIP: '<svg viewBox="0 0 64 64"><polygon points="8,12 30,32 8,52"/><polygon points="32,12 54,32 32,52"/></svg>',
+  FAVOR: '<svg viewBox="0 0 64 64"><path d="M32 56 C7 38 8 17 23 17 C31 17 32 26 32 26 C32 26 33 17 41 17 C56 17 57 38 32 56 Z"/></svg>',
+  SHUFFLE: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 20 H42 M34 12 l8 8 l-8 8"/><path d="M54 44 H22 M30 36 l-8 8 l8 8"/></svg>',
+  FUTURE: '<svg viewBox="0 0 64 64"><path d="M6 32 C18 13 46 13 58 32 C46 51 18 51 6 32 Z" fill="none" stroke="#fff" stroke-width="6"/><circle cx="32" cy="32" r="9"/></svg>',
+};
+
+const PAW_SVG = '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/></svg>';
 
 function cardFace(card) {
-  return `<div class="card-art">${artFor(card)}</div><div class="card-name">${escapeHtml(card.name)}</div>`;
+  if (card.type === 'CAT') {
+    return (
+      `<div class="card-art cat-art" data-type="CAT" style="background-image:url('/assets/cats/${card.cat}.png')">` +
+        `<span class="paw-badge">${PAW_SVG}</span>` +
+        `<div class="art-fade"></div>` +
+      `</div>` +
+      `<div class="card-name">${escapeHtml(card.name)}</div>`
+    );
+  }
+  const catId = ACTION_ART[card.type] || 'max';
+  const glyph = GLYPHS[card.type] || '';
+  return (
+    `<div class="card-art" data-type="${card.type}" style="background-image:url('/assets/cats/${catId}.png')">` +
+      `<div class="art-overlay"></div>` +
+      `<span class="art-glyph">${glyph}</span>` +
+    `</div>` +
+    `<div class="card-name">${escapeHtml(card.name)}</div>`
+  );
 }
 function miniFace(card) {
-  return `<div class="card-art" style="height:100%">${artFor(card)}</div>`;
+  return cardFace(card);
 }
 
 function escapeHtml(s) {
