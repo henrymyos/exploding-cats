@@ -625,15 +625,32 @@ function poseFor(card) {
   return POSES[h % POSES.length];
 }
 
+// Real photos per cat. Cats with several shots rotate poses across card copies.
+const CAT_PHOTOS = {
+  max: ['max.png'],
+  pepper: ['pepper.png'],
+  gambit: ['gambit.png', 'gambit2.png'],
+  loki: ['loki.png', 'loki2.png'],
+  genevieve: ['genevieve.png'],
+};
+
+function photoFor(card) {
+  const catId = card.type === 'CAT' ? card.cat : (ACTION_ART[card.type] || 'max');
+  const list = CAT_PHOTOS[catId] || [`${catId}.png`];
+  // hash the card id so each physical card keeps a stable photo, but copies vary
+  const s = (card && (card.id || card.type)) || 'x';
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return `/assets/cats/${list[h % list.length]}`;
+}
+
 function cardFace(card) {
   const isCat = card.type === 'CAT';
-  const catId = isCat ? card.cat : (ACTION_ART[card.type] || 'max');
-  const art = catSVG(catId, poseFor(card)) || '';
   const badge = isCat
     ? `<span class="corner-badge paw">${PAW_SVG}</span>`
     : `<span class="corner-badge glyph">${GLYPHS[card.type] || ''}</span>`;
   return (
-    `<div class="card-art illus" data-type="${card.type}">${badge}${art}</div>` +
+    `<div class="card-art photo" data-type="${card.type}" style="background-image:url('${photoFor(card)}')">${badge}</div>` +
     `<div class="card-name">${escapeHtml(card.name)}</div>`
   );
 }
