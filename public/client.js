@@ -144,6 +144,9 @@ $('removeBotBtn').onclick = () => {
 /* ---------------- game render ---------------- */
 function renderGame(g, lobby) {
   const me = g.players.find((p) => p.id === PLAYER_ID);
+  // The player summary in g.players only has a handCount; our actual cards
+  // come separately as g.hand. Attach them so the hand helpers can use me.hand.
+  if (me) me.hand = g.hand || [];
   const isMyTurn = g.turnPlayerId === PLAYER_ID;
 
   // opponents (everyone but me)
