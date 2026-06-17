@@ -110,14 +110,14 @@ h1 { font-size: 2.2rem; margin: 0; }
 .pile { background: none; border: none; cursor: pointer; text-align: center; color: var(--text); }
 .pile-label { display: block; font-size: .7rem; color: var(--muted); margin-top: 4px; }
 .pile-back {
-  width: 86px; height: 120px; border-radius: var(--card-radius);
+  width: 104px; height: 146px; border-radius: var(--card-radius);
   background: repeating-linear-gradient(45deg, #5b3a8a, #5b3a8a 8px, #6d49a3 8px, #6d49a3 16px);
   border: 3px solid var(--accent2); box-shadow: var(--shadow); position: relative;
 }
-.pile-back::after { content: "🐱"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 2.4rem; }
+.pile-back::after { content: "🐱"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 2.8rem; }
 .draw:hover .pile-back { transform: translateY(-4px); transition: transform .12s; }
-.pile-count { position: absolute; transform: translate(58px, -28px); background: var(--accent); border-radius: 12px; padding: 1px 8px; font-size: .8rem; font-weight: 700; }
-.card-mini { width: 86px; height: 120px; border-radius: var(--card-radius); box-shadow: var(--shadow); background: var(--panel-light); display: flex; flex-direction: column; overflow: hidden; }
+.pile-count { position: absolute; transform: translate(72px, -34px); background: var(--accent); border-radius: 12px; padding: 1px 8px; font-size: .8rem; font-weight: 700; }
+.card-mini { width: 104px; height: 146px; border-radius: var(--card-radius); box-shadow: var(--shadow); background: var(--panel-light); display: flex; flex-direction: column; overflow: hidden; }
 .card-mini.empty { background: rgba(255,255,255,.05); border: 2px dashed var(--panel-light); }
 
 .turn-banner { font-size: 1.05rem; font-weight: 600; min-height: 1.4em; text-align: center; }
@@ -132,11 +132,11 @@ h1 { font-size: 2.2rem; margin: 0; }
 
 .hand {
   display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-  max-height: 38vh; overflow-y: auto; padding: 6px;
+  max-height: 44vh; overflow-y: auto; padding: 6px;
 }
 
 .card {
-  width: 96px; height: 136px; border-radius: var(--card-radius);
+  width: 118px; height: 166px; border-radius: var(--card-radius);
   background: var(--panel-light); box-shadow: var(--shadow); cursor: pointer;
   display: flex; flex-direction: column; overflow: hidden; position: relative;
   border: 3px solid transparent; transition: transform .12s, border-color .12s; flex-shrink: 0;
@@ -145,28 +145,16 @@ h1 { font-size: 2.2rem; margin: 0; }
 .card.selected { border-color: var(--accent2); transform: translateY(-12px); }
 .card-art {
   flex: 1; position: relative; overflow: hidden;
-  background-size: cover; background-position: center;
-  background-color: rgba(0, 0, 0, .25);
+  display: grid; place-items: center;
 }
-.card-art .art-overlay { position: absolute; inset: 0; }
-.card-art .art-glyph { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; }
-.card-art .art-glyph svg { width: 48%; height: 48%; fill: #fff; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .65)); }
-.card-art.cat-art .art-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: linear-gradient(to top, rgba(20, 12, 40, .85), transparent); }
-.card-art.illus { background: radial-gradient(circle at 50% 38%, #3d3170, #211a40); display: grid; place-items: center; }
-.card-art.illus svg { width: 94%; height: 94%; display: block; }
-.card-art .paw-badge { position: absolute; top: 5px; right: 5px; width: 20px; height: 20px; background: rgba(255, 94, 138, .92); border-radius: 50%; padding: 3px; z-index: 2; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
-.card-art .paw-badge svg { width: 100%; height: 100%; fill: #fff; display: block; }
-.card .card-name { font-size: .62rem; font-weight: 700; text-align: center; padding: 5px 2px; line-height: 1.1; position: relative; z-index: 1; }
-
-/* per-type photo tint (cat shows at top, color/glyph at bottom) */
-.card-art[data-type="EXPLODE"] .art-overlay { background: linear-gradient(to top, rgba(178, 31, 31, .92), rgba(255, 90, 90, .25)); }
-.card-art[data-type="DEFUSE"]  .art-overlay { background: linear-gradient(to top, rgba(42, 157, 111, .92), rgba(94, 224, 168, .25)); }
-.card-art[data-type="NOPE"]    .art-overlay { background: linear-gradient(to top, rgba(212, 69, 42, .92), rgba(255, 143, 107, .25)); }
-.card-art[data-type="ATTACK"]  .art-overlay { background: linear-gradient(to top, rgba(168, 34, 90, .92), rgba(255, 94, 138, .25)); }
-.card-art[data-type="SKIP"]    .art-overlay { background: linear-gradient(to top, rgba(58, 95, 212, .92), rgba(122, 168, 255, .25)); }
-.card-art[data-type="FAVOR"]   .art-overlay { background: linear-gradient(to top, rgba(138, 58, 212, .92), rgba(217, 155, 255, .25)); }
-.card-art[data-type="SHUFFLE"] .art-overlay { background: linear-gradient(to top, rgba(212, 154, 42, .92), rgba(255, 207, 94, .25)); }
-.card-art[data-type="FUTURE"]  .art-overlay { background: linear-gradient(to top, rgba(42, 157, 168, .92), rgba(94, 224, 224, .25)); }
+/* the cat illustration sits on the card's own type-colored gradient, with a soft vignette for depth */
+.card-art.illus { background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.12), rgba(0,0,0,.20)); }
+.card-art.illus svg { width: 96%; height: 96%; display: block; filter: drop-shadow(0 3px 4px rgba(0,0,0,.35)); }
+.corner-badge { position: absolute; top: 6px; right: 6px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; z-index: 2; box-shadow: 0 1px 5px rgba(0,0,0,.45); }
+.corner-badge svg { width: 64%; height: 64%; fill: #fff; display: block; }
+.corner-badge.glyph { background: rgba(18, 10, 36, .68); }
+.corner-badge.paw { background: rgba(255, 94, 138, .95); }
+.card .card-name { font-size: .68rem; font-weight: 700; text-align: center; padding: 6px 2px; line-height: 1.1; position: relative; z-index: 1; }
 
 .card[data-type="EXPLODE"] { background: linear-gradient(160deg, #ff5a5a, #b21f1f); }
 .card[data-type="DEFUSE"] { background: linear-gradient(160deg, #5ee0a8, #2a9d6f); }
@@ -205,6 +193,7 @@ h1 { font-size: 2.2rem; margin: 0; }
 
 /* log */
 .log-toggle { position: fixed; top: 10px; right: 10px; z-index: 30; background: var(--panel); border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.2rem; cursor: pointer; color: var(--text); box-shadow: var(--shadow); }
+.menu-toggle { position: fixed; top: 10px; left: 10px; z-index: 30; background: var(--panel); border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.3rem; cursor: pointer; color: var(--text); box-shadow: var(--shadow); }
 .log-panel {
   position: fixed; top: 0; right: -320px; width: 300px; height: 100%; background: var(--panel);
   z-index: 35; padding: 16px; box-shadow: var(--shadow); transition: right .2s; overflow-y: auto;
@@ -224,6 +213,6 @@ h1 { font-size: 2.2rem; margin: 0; }
 .toast.err { background: var(--danger); }
 
 @media (max-width: 480px) {
-  .card { width: 80px; height: 114px; }
-  .pile-back, .card-mini { width: 72px; height: 100px; }
+  .card { width: 98px; height: 138px; }
+  .pile-back, .card-mini { width: 88px; height: 124px; }
 }

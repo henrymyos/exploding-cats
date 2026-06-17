@@ -28,6 +28,7 @@ class Game {
       id: p.id,
       name: p.name,
       isBot: !!p.isBot,
+      botControlled: false, // a human seat temporarily driven by the AI (left/disconnected)
       hand: [],
       alive: true,
     }));
@@ -181,7 +182,7 @@ class Game {
       players: this.players.map((p) => ({
         id: p.id,
         name: p.name,
-        isBot: p.isBot,
+        isBot: p.isBot || p.botControlled,
         alive: p.alive,
         handCount: p.hand.length,
       })),

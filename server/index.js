@@ -136,12 +136,35 @@ io.on('connection', (socket) => {
     withGame(code, (g) => g.dismissFuture(playerId), cb);
   });
 
+  socket.on('leaveGame', ({ code, playerId }, cb) => {
+    manager.leaveGame(code, playerId);
+    socketIndex.delete(socket.id);
+    socket.leave(code);
+    ackOk(cb);
+    const room = manager.getRoom(code);
+    if (room) {
+      broadcast(code);
+      if (room.game) manager.scheduleBots(room);
+    }
+  });
+
+  socket.on('endGame', ({ code, playerId }, cb) => {
+    const { error } = manager.endGame(code, playerId);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
+  });
+
   socket.on('disconnect', () => {
     const info = socketIndex.get(socket.id);
     if (info) {
       manager.leaveRoom(info.code, info.playerId);
       socketIndex.delete(socket.id);
-      broadcast(info.code);
+      const room = manager.getRoom(info.code);
+      if (room) {
+        broadcast(info.code);
+        if (room.game) manager.scheduleBots(room); // AI covers the seat if needed
+      }
     }
   });
 });

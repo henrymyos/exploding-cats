@@ -481,6 +481,40 @@ $('overlay').onclick = (e) => {
   if (e.target.id === 'overlay' && !$('overlay')._sticky) closeOverlay();
 };
 
+/* ---------------- game menu (leave / end) ---------------- */
+function goHome() {
+  state.code = null;
+  state.lobby = null;
+  state.game = null;
+  localStorage.removeItem('ec_code');
+  closeOverlay();
+  $('logPanel').classList.remove('open');
+  showScreen('home');
+}
+
+$('menuToggle').onclick = () => {
+  const isHost = state.lobby && state.lobby.hostId === PLAYER_ID;
+  openOverlay(
+    `<h2>Game menu</h2>` +
+    `<p class="hint">Room <span class="code">${state.code || ''}</span></p>` +
+    `<button class="btn primary" id="resumeBtn">Resume game</button>` +
+    (isHost ? `<button class="btn" id="endBtn">End game → back to lobby</button>` : '') +
+    `<button class="btn danger" id="leaveBtn">Leave game</button>`
+  );
+  $('resumeBtn').onclick = closeOverlay;
+  $('leaveBtn').onclick = () => {
+    socket.emit('leaveGame', { code: state.code, playerId: PLAYER_ID }, () => {});
+    goHome();
+  };
+  const endBtn = document.getElementById('endBtn');
+  if (endBtn) endBtn.onclick = () => {
+    socket.emit('endGame', { code: state.code, playerId: PLAYER_ID }, (res) => {
+      if (!res.ok) return toast(res.error, true);
+      closeOverlay(); // server broadcasts the room back to the lobby
+    });
+  };
+};
+
 /* ---------------- log ---------------- */
 $('logToggle').onclick = () => $('logPanel').classList.toggle('open');
 function renderLog(log) {
@@ -522,68 +556,84 @@ const GLYPHS = {
 const PAW_SVG = '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/></svg>';
 
 // Stylized vector portraits of each cat, matched to their real coloring.
+// Each cat can be drawn in several poses (see catSVG / POSES below).
+const POSES = ['sit', 'loaf', 'sleep'];
 const CAT_ILLUS = {
-  max:       { base:'#e8913f', stroke:'#b5670f', chest:'#fbe9d2', muzzle:'#fbe9d2', inner:'#f4b3aa', eye:'#6fae54', stripes:true, stripeColor:'#b5670f', tail:'right' },
-  pepper:    { base:'#9b9b9b', stroke:'#666', chest:'#ededed', muzzle:'#ededed', inner:'#f0b6ad', eye:'#7bae54', stripes:true, stripeColor:'#5f5f5f', tail:'left', wink:true },
-  gambit:    { base:'#2c2c2c', stroke:'#0c0c0c', chest:'#ffffff', muzzle:'#ffffff', inner:'#e08f8f', eye:'#9bd36b', tail:'right', patch:'M70 96 a52 52 0 0 1 100 0 q-50 -34 -100 0 Z', patchColor:'#2c2c2c' },
-  loki:      { base:'#f1e7d4', stroke:'#cdbfa3', chest:'#ffffff', muzzle:'#ffffff', inner:'#f4b3aa', eye:'#7fb0c9', earBase:'#e8913f', tail:'left', patch:'M78 72 q42 -30 84 0 q-20 28 -42 28 q-22 0 -42 -28 Z', patchColor:'#e8913f' },
-  genevieve: { base:'#ffffff', stroke:'#c4c9d0', chest:'#ffffff', muzzle:'#ffffff', inner:'#f0b6ad', eye:'#d2a23c', earBase:'#aab0b8', tail:'right', patch:'M74 78 q46 -34 92 0 q-22 30 -46 30 q-24 0 -46 -30 Z', patchColor:'#aab0b8' },
+  max:       { base:'#e8913f', stroke:'#b5670f', chest:'#fbe9d2', muzzle:'#fbe9d2', inner:'#f4b3aa', eye:'#6fae54', stripes:true, sc:'#b5670f' },
+  pepper:    { base:'#9b9288', stroke:'#6a6258', chest:'#e9e4dc', muzzle:'#e9e4dc', inner:'#f0b6ad', eye:'#8ab04f', stripes:true, sc:'#5f584f' },
+  gambit:    { base:'#2c2c2c', stroke:'#0c0c0c', chest:'#ffffff', muzzle:'#ffffff', inner:'#e08f8f', eye:'#9bd36b' },
+  loki:      { base:'#f1e7d4', stroke:'#cdbfa3', chest:'#ffffff', muzzle:'#ffffff', inner:'#f4b3aa', eye:'#7fb0c9', earBase:'#e8913f', cap:'M-58,-10 A60 60 0 0 1 58,-10 C 40,-30 -40,-30 -58,-10 Z', capColor:'#e8913f' },
+  genevieve: { base:'#ffffff', stroke:'#c4c9d0', chest:'#ffffff', muzzle:'#ffffff', inner:'#f0b6ad', eye:'#d2a23c', earBase:'#8f969e', cap:'M-58,-6 A60 60 0 0 1 58,-6 C 40,-24 30,8 0,8 C -30,8 -40,-24 -58,-6 Z', capColor:'#8f969e' },
 };
 
-function catSVG(catId) {
+// Face + ears + markings, drawn centered at local (0,0) with head radius 60.
+function catHead(o, sleep) {
+  const ear = (s) =>
+    `<polygon points="${s * 22},-48 ${s * 32},-90 ${s * 58},-46" fill="${o.earBase || o.base}" stroke="${o.stroke}" stroke-width="3" stroke-linejoin="round"/>` +
+    `<polygon points="${s * 28},-50 ${s * 34},-74 ${s * 50},-48" fill="${o.inner}"/>`;
+  const cap = o.cap ? `<path d="${o.cap}" fill="${o.capColor}"/>` : '';
+  const stripes = o.stripes
+    ? `<g stroke="${o.sc}" stroke-width="5" stroke-linecap="round" fill="none"><path d="M0,-46 v22"/><path d="M-16,-42 l-5 18"/><path d="M16,-42 l5 18"/><path d="M-58,4 q14 5 0 11"/><path d="M58,4 q-14 5 0 11"/></g>`
+    : '';
+  const eye = (cx) => sleep
+    ? `<path d="M${cx - 12},-2 q12 10 24 0" stroke="#1c1c22" stroke-width="4" fill="none" stroke-linecap="round"/>`
+    : `<ellipse cx="${cx}" cy="-2" rx="13" ry="16" fill="#1c1c22"/><ellipse cx="${cx}" cy="-2" rx="6" ry="11" fill="${o.eye}"/><circle cx="${cx + 4}" cy="-7" r="3" fill="#fff"/>`;
+  return `${ear(-1)}${ear(1)}<circle r="60" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>${cap}${stripes}` +
+    `<path d="M0,34 C -36,34 -52,10 -52,-8 L 52,-8 C 52,10 36,34 0,34 Z" fill="${o.muzzle}"/>` +
+    `${eye(-24)}${eye(24)}` +
+    `<polygon points="0,12 -8,19 8,19" fill="#e08aa0"/>` +
+    `<path d="M0,19 v7 M0,26 q-9 7 -16 2 M0,26 q9 7 16 2" stroke="#7a5a4a" stroke-width="3" fill="none" stroke-linecap="round"/>` +
+    `<g stroke="${o.stroke}" stroke-width="2.5" stroke-linecap="round" opacity=".75"><path d="M-34,4 l-32 -7 M-34,12 l-32 4"/><path d="M34,4 l32 -7 M34,12 l32 4"/></g>`;
+}
+
+// Draw a cat in one of the POSES. Reuses catHead so the face stays consistent.
+function catSVG(catId, kind) {
   const o = CAT_ILLUS[catId];
   if (!o) return null;
-  const tailPaths = {
-    right: 'M168 240 C 220 235 225 175 205 150 C 196 165 200 205 165 215 Z',
-    left:  'M72 240 C 20 235 15 175 35 150 C 44 165 40 205 75 215 Z',
-  };
-  const ear = (cx, dir) =>
-    `<polygon points="${cx},58 ${cx + dir * 6},20 ${cx + dir * 40},52" fill="${o.earBase || o.base}" stroke="${o.stroke}" stroke-width="3" stroke-linejoin="round"/>` +
-    `<polygon points="${cx + dir * 8},52 ${cx + dir * 10},32 ${cx + dir * 30},50" fill="${o.inner}"/>`;
-  const headPatch = o.patch ? `<path d="${o.patch}" fill="${o.patchColor}"/>` : '';
-  const stripes = o.stripes
-    ? `<path d="M120 50 v22" stroke="${o.stripeColor}" stroke-width="5" stroke-linecap="round"/>` +
-      `<path d="M104 54 l-6 18" stroke="${o.stripeColor}" stroke-width="5" stroke-linecap="round"/>` +
-      `<path d="M136 54 l6 18" stroke="${o.stripeColor}" stroke-width="5" stroke-linecap="round"/>` +
-      `<path d="M62 110 q14 6 0 12 M62 130 q14 6 0 12" stroke="${o.stripeColor}" stroke-width="5" stroke-linecap="round" fill="none"/>` +
-      `<path d="M178 110 q-14 6 0 12 M178 130 q-14 6 0 12" stroke="${o.stripeColor}" stroke-width="5" stroke-linecap="round" fill="none"/>`
-    : '';
-  const eye = (cx) =>
-    `<ellipse cx="${cx}" cy="108" rx="13" ry="${o.wink ? 3 : 16}" fill="${o.wink ? 'none' : '#1c1c22'}" stroke="${o.wink ? '#1c1c22' : 'none'}" stroke-width="4"/>` +
-    (o.wink ? '' : `<ellipse cx="${cx}" cy="108" rx="6" ry="11" fill="${o.eye}"/><circle cx="${cx + 4}" cy="103" r="3" fill="#fff"/>`);
-  return (
-    `<svg viewBox="0 0 240 260">` +
-      `<path d="${tailPaths[o.tail]}" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
-      `<path d="M120 150 C 66 150 58 240 72 258 L 168 258 C 182 240 174 150 120 150 Z" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
-      `<ellipse cx="120" cy="222" rx="33" ry="40" fill="${o.chest}"/>` +
-      `<ellipse cx="98" cy="256" rx="15" ry="11" fill="${o.chest}"/><ellipse cx="142" cy="256" rx="15" ry="11" fill="${o.chest}"/>` +
-      ear(96, -1) + ear(144, 1) +
-      `<circle cx="120" cy="108" r="64" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
-      headPatch + stripes +
-      `<path d="M120 150 c-34 0 -50 -20 -50 -34 0 0 100 0 100 0 0 14 -16 34 -50 34 Z" fill="${o.muzzle}"/>` +
-      eye(96) + eye(144) +
-      `<polygon points="120,124 112,131 128,131" fill="#e08aa0"/>` +
-      `<path d="M120 131 v8 M120 139 q-9 7 -16 2 M120 139 q9 7 16 2" stroke="#7a5a4a" stroke-width="3" fill="none" stroke-linecap="round"/>` +
-      `<g stroke="${o.stroke}" stroke-width="2.5" stroke-linecap="round" opacity=".8"><path d="M86 128 l-34 -6 M86 136 l-34 4"/><path d="M154 128 l34 -6 M154 136 l34 4"/></g>` +
-    `</svg>`
-  );
+  kind = kind || 'sit';
+  if (kind === 'sit') {
+    return `<svg viewBox="0 0 240 260">` +
+      `<path d="M168 238 C 222 232 224 172 203 150 C 196 166 200 206 164 214 Z" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
+      `<path d="M120 132 C 68 132 58 240 76 256 L 164 256 C 182 240 172 132 120 132 Z" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
+      `<ellipse cx="120" cy="214" rx="30" ry="38" fill="${o.chest}"/>` +
+      `<ellipse cx="100" cy="254" rx="15" ry="10" fill="${o.chest}"/><ellipse cx="140" cy="254" rx="15" ry="10" fill="${o.chest}"/>` +
+      `<g transform="translate(120,86)">${catHead(o, false)}</g></svg>`;
+  }
+  if (kind === 'loaf') {
+    return `<svg viewBox="0 0 240 260">` +
+      `<path d="M196 214 C 232 206 230 176 212 170 C 210 184 206 200 184 204 Z" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
+      `<ellipse cx="120" cy="196" rx="92" ry="50" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
+      `<ellipse cx="120" cy="206" rx="30" ry="26" fill="${o.chest}"/>` +
+      `<ellipse cx="92" cy="236" rx="19" ry="9" fill="${o.chest}"/><ellipse cx="148" cy="236" rx="19" ry="9" fill="${o.chest}"/>` +
+      `<g transform="translate(120,104)">${catHead(o, false)}</g></svg>`;
+  }
+  // sleep (curled up, eyes closed)
+  return `<svg viewBox="0 0 240 260">` +
+    `<circle cx="128" cy="158" r="80" fill="${o.base}" stroke="${o.stroke}" stroke-width="3"/>` +
+    `<path d="M60 196 C 36 226 110 250 188 214" fill="none" stroke="${o.base}" stroke-width="24" stroke-linecap="round"/>` +
+    `<path d="M60 196 C 36 226 110 250 188 214" fill="none" stroke="${o.stroke}" stroke-width="24" stroke-linecap="round" opacity=".18"/>` +
+    `<ellipse cx="150" cy="150" rx="44" ry="34" fill="${o.chest}" opacity=".55"/>` +
+    `<g transform="translate(96,150) rotate(18)">${catHead(o, true)}</g></svg>`;
+}
+
+// Pick a pose deterministically from a card's id, so each physical card keeps
+// the same pose between renders but different copies show different poses.
+function poseFor(card) {
+  const s = (card && (card.id || card.type)) || 'x';
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return POSES[h % POSES.length];
 }
 
 function cardFace(card) {
-  if (card.type === 'CAT') {
-    const illus = catSVG(card.cat);
-    const art = illus
-      ? `<div class="card-art cat-art illus" data-type="CAT"><span class="paw-badge">${PAW_SVG}</span>${illus}</div>`
-      : `<div class="card-art cat-art" data-type="CAT" style="background-image:url('/assets/cats/${card.cat}.png')"><span class="paw-badge">${PAW_SVG}</span><div class="art-fade"></div></div>`;
-    return art + `<div class="card-name">${escapeHtml(card.name)}</div>`;
-  }
-  const catId = ACTION_ART[card.type] || 'max';
-  const glyph = GLYPHS[card.type] || '';
+  const isCat = card.type === 'CAT';
+  const catId = isCat ? card.cat : (ACTION_ART[card.type] || 'max');
+  const art = catSVG(catId, poseFor(card)) || '';
+  const badge = isCat
+    ? `<span class="corner-badge paw">${PAW_SVG}</span>`
+    : `<span class="corner-badge glyph">${GLYPHS[card.type] || ''}</span>`;
   return (
-    `<div class="card-art" data-type="${card.type}" style="background-image:url('/assets/cats/${catId}.png')">` +
-      `<div class="art-overlay"></div>` +
-      `<span class="art-glyph">${glyph}</span>` +
-    `</div>` +
+    `<div class="card-art illus" data-type="${card.type}">${badge}${art}</div>` +
     `<div class="card-name">${escapeHtml(card.name)}</div>`
   );
 }
