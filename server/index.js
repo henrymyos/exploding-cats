@@ -1,0 +1,137 @@
+'use strict';
+
+const path = require('path');
+const http = require('http');
+const express = require('express');
+const { Server } = require('socket.io');
+
+const { RoomManager } = require('./rooms');
+const { catList } = require('./cards');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server);
+
+const PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, '..', 'public');
+
+app.use(express.static(PUBLIC_DIR));
+
+// Expose the cat roster so the client can label things without hardcoding.
+app.get('/api/cats', (_req, res) => {
+  res.json(catList());
+});
+
+// ------------------------------------------------------------------
+// Real-time game wiring
+// ------------------------------------------------------------------
+
+// Send each player their own (hidden-info) snapshot of a room.
+function broadcast(code) {
+  const room = manager.getRoom(code);
+  if (!room) return;
+  const lobby = {
+    code: room.code,
+    hostId: room.hostId,
+    started: !!room.game,
+    players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
+  };
+  for (const p of room.players) {
+    const payload = { lobby };
+    if (room.game) payload.game = room.game.snapshotFor(p.id);
+    io.to(socketForPlayer(code, p.id)).emit('state', payload);
+  }
+}
+
+const manager = new RoomManager(broadcast);
+
+// Track which socket belongs to which player in which room.
+const socketIndex = new Map(); // socket.id -> { code, playerId }
+function socketForPlayer(code, playerId) {
+  for (const [sid, info] of socketIndex.entries()) {
+    if (info.code === code && info.playerId === playerId) return sid;
+  }
+  return '__none__';
+}
+
+function ackErr(cb, error) {
+  if (typeof cb === 'function') cb({ ok: false, error });
+}
+function ackOk(cb, data = {}) {
+  if (typeof cb === 'function') cb({ ok: true, ...data });
+}
+
+io.on('connection', (socket) => {
+  socket.on('createRoom', ({ name, playerId }, cb) => {
+    if (!name || !playerId) return ackErr(cb, 'Missing name.');
+    const room = manager.createRoom(name.trim().slice(0, 16), playerId);
+    socketIndex.set(socket.id, { code: room.code, playerId });
+    socket.join(room.code);
+    ackOk(cb, { code: room.code });
+    broadcast(room.code);
+  });
+
+  socket.on('joinRoom', ({ code, name, playerId }, cb) => {
+    if (!name || !playerId || !code) return ackErr(cb, 'Missing details.');
+    const { room, error } = manager.joinRoom(code, name.trim().slice(0, 16), playerId);
+    if (error) return ackErr(cb, error);
+    socketIndex.set(socket.id, { code: room.code, playerId });
+    socket.join(room.code);
+    ackOk(cb, { code: room.code });
+    broadcast(room.code);
+  });
+
+  socket.on('startGame', ({ code, playerId }, cb) => {
+    const { error } = manager.startGame(code, playerId);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
+  });
+
+  // ---- in-game moves ----
+  const withGame = (code, fn, cb) => {
+    const room = manager.getRoom(code);
+    if (!room || !room.game) return ackErr(cb, 'No active game.');
+    const result = fn(room.game);
+    if (result && result.ok === false) return ackErr(cb, result.error);
+    ackOk(cb, result || {});
+    manager.afterMutation(room);
+  };
+
+  socket.on('play', ({ code, playerId, cardIds, targetId, namedType }, cb) => {
+    withGame(code, (g) => g.playCards(playerId, cardIds, { targetId, namedType }), cb);
+  });
+
+  socket.on('nope', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.playNope(playerId), cb);
+  });
+
+  socket.on('draw', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.drawCard(playerId), cb);
+  });
+
+  socket.on('favorGive', ({ code, playerId, cardId }, cb) => {
+    withGame(code, (g) => g.favorGive(playerId, cardId), cb);
+  });
+
+  socket.on('defusePlace', ({ code, playerId, index }, cb) => {
+    withGame(code, (g) => g.defusePlace(playerId, index), cb);
+  });
+
+  socket.on('dismissFuture', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.dismissFuture(playerId), cb);
+  });
+
+  socket.on('disconnect', () => {
+    const info = socketIndex.get(socket.id);
+    if (info) {
+      manager.leaveRoom(info.code, info.playerId);
+      socketIndex.delete(socket.id);
+      broadcast(info.code);
+    }
+  });
+});
+
+server.listen(PORT, () => {
+  console.log(`🐱 Exploding Cats running at http://localhost:${PORT}`);
+});

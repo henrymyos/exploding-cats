@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Exploding Cats — Family Edition</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+</head>
+<body>
+  <div id="app">
+
+    <!-- ============ HOME / LOBBY JOIN ============ -->
+    <section id="home" class="screen active">
+      <div class="home-card">
+        <h1>🐱 Exploding Cats</h1>
+        <p class="tagline">Family Edition</p>
+
+        <label class="field">
+          <span>Your name</span>
+          <input id="nameInput" type="text" maxlength="16" placeholder="e.g. Mom" autocomplete="off" />
+        </label>
+
+        <button id="createBtn" class="btn primary">Create a game</button>
+
+        <div class="divider"><span>or join one</span></div>
+
+        <label class="field">
+          <span>Room code</span>
+          <input id="codeInput" type="text" maxlength="4" placeholder="ABCD" autocomplete="off" />
+        </label>
+        <button id="joinBtn" class="btn">Join game</button>
+
+        <p id="homeError" class="error"></p>
+      </div>
+    </section>
+
+    <!-- ============ LOBBY ============ -->
+    <section id="lobby" class="screen">
+      <div class="home-card">
+        <h2>Room <span id="lobbyCode" class="code"></span></h2>
+        <p class="hint">Share this code with your family so they can join from their own device.</p>
+        <ul id="lobbyPlayers" class="player-list"></ul>
+        <button id="startBtn" class="btn primary">Start game</button>
+        <p id="lobbyHint" class="hint"></p>
+      </div>
+    </section>
+
+    <!-- ============ GAME TABLE ============ -->
+    <section id="game" class="screen">
+      <header class="table-top">
+        <div id="opponents" class="opponents"></div>
+      </header>
+
+      <main class="table-center">
+        <div class="piles">
+          <button id="drawPile" class="pile draw" title="Draw a card">
+            <div class="pile-back"></div>
+            <span id="deckCount" class="pile-count">0</span>
+            <span class="pile-label">Draw</span>
+          </button>
+          <div class="pile discard">
+            <div id="discardTop" class="card-mini empty"></div>
+            <span class="pile-label">Discard</span>
+          </div>
+        </div>
+        <div id="turnBanner" class="turn-banner"></div>
+        <div id="pendingArea" class="pending-area"></div>
+      </main>
+
+      <footer class="hand-area">
+        <div id="handActions" class="hand-actions"></div>
+        <div id="hand" class="hand"></div>
+      </footer>
+
+      <button id="logToggle" class="log-toggle" title="Game log">📜</button>
+      <aside id="logPanel" class="log-panel">
+        <h3>Game log</h3>
+        <ul id="logList"></ul>
+      </aside>
+    </section>
+
+    <!-- ============ OVERLAYS / MODALS ============ -->
+    <div id="overlay" class="overlay hidden">
+      <div id="overlayBox" class="overlay-box"></div>
+    </div>
+
+    <!-- Hiss (Nope) prompt -->
+    <div id="hissBar" class="hiss-bar hidden">
+      <span id="hissText"></span>
+      <button id="hissBtn" class="btn danger">Hiss! 🙀</button>
+    </div>
+
+    <!-- toast -->
+    <div id="toast" class="toast hidden"></div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="client.js"></script>
+</body>
+</html>
