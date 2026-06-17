@@ -124,6 +124,10 @@ io.on('connection', (socket) => {
     withGame(code, (g) => g.drawCard(playerId), cb);
   });
 
+  socket.on('continueTurn', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.continueTurn(playerId), cb);
+  });
+
   socket.on('favorGive', ({ code, playerId, cardId }, cb) => {
     withGame(code, (g) => g.favorGive(playerId, cardId), cb);
   });

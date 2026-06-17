@@ -314,8 +314,33 @@ Game.prototype.drawCard = function drawCard(playerId) {
 
   player.hand.push(card);
   this.logMsg(`${player.name} drew a card.`);
+  // Pause on the drawn card so the player can see it, then they Continue to
+  // end the turn. (The card is already in their hand.)
+  this.pending = {
+    kind: 'drawn',
+    actorId: player.id,
+    card,
+    endsAt: Date.now() + 30000,
+  };
+  return ok({ exploded: false, card });
+};
+
+// End the turn after reviewing a drawn card.
+Game.prototype.continueTurn = function continueTurn(playerId) {
+  if (!this.pending || this.pending.kind !== 'drawn') return err('Nothing to continue.');
+  if (this.pending.actorId !== playerId) return err('Not your draw to continue.');
+  this.pending = null;
   this.advanceTurn();
-  return ok({ exploded: false });
+  this.checkWin();
+  return ok();
+};
+
+Game.prototype.continueTurnAuto = function continueTurnAuto() {
+  if (this.pending && this.pending.kind === 'drawn') {
+    this.pending = null;
+    this.advanceTurn();
+    this.checkWin();
+  }
 };
 
 Game.prototype.defusePlace = function defusePlace(playerId, index) {

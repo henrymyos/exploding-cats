@@ -215,6 +215,9 @@ class Game {
       base.youMustPlace = true;
       base.maxIndex = this.deck.length;
     }
+    if (p.kind === 'drawn' && p.actorId === playerId) {
+      base.youDrew = p.card; // only the drawer sees what they drew
+    }
     if (p.kind === 'stealPick' && p.targetId === playerId && p.mode === 'named') {
       // target doesn't choose for named steal; nothing extra
     }

@@ -196,6 +196,26 @@ function renderGame(g, lobby) {
   renderLog(g.log);
 }
 
+// Display order for grouping the hand.
+const TYPE_ORDER = ['DEFUSE', 'ATTACK', 'SKIP', 'FAVOR', 'SHUFFLE', 'FUTURE', 'NOPE', 'CAT', 'EXPLODE'];
+
+// Group identical cards together and sort the groups for a tidy, stacked hand.
+function groupHand(hand) {
+  const groups = new Map();
+  for (const card of hand) {
+    const key = card.type === 'CAT' ? `cat:${card.cat}` : `type:${card.type}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, isCat: card.type === 'CAT', type: card.type, cat: card.cat, name: card.name, cards: [] });
+    }
+    groups.get(key).cards.push(card);
+  }
+  return [...groups.values()].sort((a, b) => {
+    const ta = TYPE_ORDER.indexOf(a.type), tb = TYPE_ORDER.indexOf(b.type);
+    if (ta !== tb) return ta - tb;
+    return (a.cat || '').localeCompare(b.cat || '');
+  });
+}
+
 function renderHand(g, me, isMyTurn) {
   const hand = $('hand');
   hand.innerHTML = '';
@@ -204,37 +224,47 @@ function renderHand(g, me, isMyTurn) {
   const held = new Set(me.hand.map((c) => c.id));
   selected = new Set([...selected].filter((id) => held.has(id)));
 
-  for (const card of me.hand) {
-    const el = document.createElement('div');
-    el.className = 'card' + (selected.has(card.id) ? ' selected' : '');
-    el.dataset.type = card.type;
-    el.innerHTML = cardFace(card);
-    el.onclick = () => toggleSelect(card, g, me);
-    hand.appendChild(el);
+  for (const grp of groupHand(me.hand)) {
+    const selCount = grp.cards.filter((c) => selected.has(c.id)).length;
+    const stack = document.createElement('div');
+    stack.className = 'stack' + (selCount > 0 ? ' sel' : '');
+    // fan up to 4 identical cards
+    grp.cards.slice(0, 4).forEach((card, i) => {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.dataset.type = card.type;
+      el.style.zIndex = String(i);
+      if (i > 0) el.classList.add('fanned');
+      el.innerHTML = cardFace(card);
+      stack.appendChild(el);
+    });
+    if (grp.cards.length > 1) {
+      const badge = document.createElement('span');
+      badge.className = 'stack-count';
+      badge.textContent = '×' + grp.cards.length;
+      stack.appendChild(badge);
+    }
+    if (selCount > 0) {
+      const pill = document.createElement('span');
+      pill.className = 'stack-sel';
+      pill.textContent = selCount + ' picked';
+      stack.appendChild(pill);
+    }
+    stack.onclick = () => cycleGroup(grp, g, me);
+    hand.appendChild(stack);
   }
   renderHandActions(g, me, isMyTurn);
 }
 
-function toggleSelect(card, g, me) {
-  // Cat cards: allow multi-select of the SAME cat for combos. Others: single.
-  if (selected.has(card.id)) { selected.delete(card.id); }
-  else {
-    if (card.type === 'CAT') {
-      // drop any non-matching selections
-      for (const id of [...selected]) {
-        const c = me.hand.find((x) => x.id === id);
-        if (!c || c.type !== 'CAT' || c.cat !== card.cat) selected.delete(id);
-      }
-    } else {
-      selected.clear();
-    }
-    selected.add(card.id);
-  }
-  renderHandActions(g, me, g.turnPlayerId === PLAYER_ID);
-  // re-mark selected without full rerender
-  document.querySelectorAll('#hand .card').forEach((el, i) => {
-    el.classList.toggle('selected', selected.has(me.hand[i].id));
-  });
+// Tapping a stack cycles how many of that card are selected (0→1→…→max→0).
+// Selecting a new group clears any previous selection.
+function cycleGroup(grp, g, me) {
+  if (!(g.turnPlayerId === PLAYER_ID) || g.pending) return;
+  const k = grp.cards.filter((c) => selected.has(c.id)).length;
+  const maxSel = grp.isCat ? Math.min(grp.cards.length, 3) : 1;
+  const newK = k >= maxSel ? 0 : k + 1;
+  selected = new Set(grp.cards.slice(0, newK).map((c) => c.id));
+  renderHand(g, me, g.turnPlayerId === PLAYER_ID);
 }
 
 function renderHandActions(g, me, isMyTurn) {
@@ -393,6 +423,29 @@ function renderPending(g, me) {
   if (p.kind === 'defuse' && p.youMustPlace) {
     showDefuse(p.maxIndex);
   }
+
+  // Draw reveal: I just drew a card — show it big, then Continue ends my turn.
+  if (p.kind === 'drawn') {
+    if (p.youDrew) showDrawReveal(p.youDrew);
+    else area.textContent = `${p.actorName} is checking their draw…`;
+  }
+}
+
+function showDrawReveal(card) {
+  if (overlayMode === 'reveal') return;
+  overlayMode = 'reveal';
+  openOverlay(
+    `<h2>You drew…</h2>` +
+    `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
+    `<button class="btn primary" id="drawContinueBtn">Continue → end turn</button>`,
+    true
+  );
+  $('drawContinueBtn').onclick = () => {
+    socket.emit('continueTurn', { code: state.code, playerId: PLAYER_ID }, (res) => {
+      if (!res.ok) toast(res.error, true);
+    });
+    closeOverlay();
+  };
 }
 
 $('hissBtn').onclick = () => {

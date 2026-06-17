@@ -190,6 +190,7 @@ class RoomManager {
     else if (kind === 'future') game.dismissFutureAuto();
     else if (kind === 'favorPick') game.favorAuto();
     else if (kind === 'defuse') game.defuseAuto();
+    else if (kind === 'drawn') game.continueTurnAuto();
     // A resolution can open a NEW pending (e.g. action -> favorPick); chain it.
     this.scheduleResolve(room);
     this.broadcast(room.code);
@@ -247,6 +248,10 @@ class RoomManager {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'future', p.viewerId), rand(900, 1600));
       return;
     }
+    if (p && p.kind === 'drawn' && this.isBot(g, p.actorId)) {
+      room.botTimer = setTimeout(() => this.runBotJob(room, 'continue', p.actorId), rand(500, 1000));
+      return;
+    }
     if (!p) {
       const cur = g.currentPlayer();
       if (cur && isBotSeat(cur) && cur.alive) {
@@ -284,6 +289,8 @@ class RoomManager {
         if (deckTop) g.botMemory[botId] = { topCardId: deckTop.id, topType: deckTop.type };
         g.dismissFuture(botId);
       }
+    } else if (type === 'continue') {
+      if (p && p.kind === 'drawn' && p.actorId === botId) g.continueTurn(botId);
     } else if (type === 'turn') {
       if (!p && g.currentPlayer() && g.currentPlayer().id === botId) {
         const action = brain.chooseTurnAction(g, bot);

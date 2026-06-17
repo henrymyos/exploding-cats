@@ -164,6 +164,22 @@ h1 { font-size: 2.2rem; margin: 0; }
 .card[data-type="FUTURE"] { background: linear-gradient(160deg, #5ee0e0, #2a9da8); }
 .card[data-type="CAT"] { background: linear-gradient(160deg, var(--panel-light), #2a2150); }
 
+/* stacked / fanned hand: identical cards grouped into one tappable pile */
+.stack { position: relative; display: flex; align-items: flex-start; cursor: pointer; transition: transform .12s; flex-shrink: 0; }
+.stack:hover { transform: translateY(-8px); }
+.stack.sel { transform: translateY(-12px); }
+.stack .card { transition: border-color .12s; }
+.stack .card:hover { transform: none; }
+.stack .card.fanned { margin-left: -96px; }
+.stack.sel .card { border-color: var(--accent2); }
+.stack-count { position: absolute; bottom: 8px; right: 8px; background: rgba(18,10,36,.82); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: .72rem; font-weight: 700; z-index: 10; }
+.stack-sel { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--accent2); color: #1a1430; border-radius: 10px; padding: 1px 9px; font-size: .68rem; font-weight: 700; z-index: 10; white-space: nowrap; box-shadow: var(--shadow); }
+
+/* big card shown when you draw */
+.reveal-card { display: flex; justify-content: center; margin: 16px 0; }
+.reveal-card .card { width: 188px; height: 264px; cursor: default; }
+.reveal-card .card:hover { transform: none; }
+
 /* ---------------- Overlay / modal ---------------- */
 .overlay { position: fixed; inset: 0; background: rgba(10,6,24,.78); display: grid; place-items: center; z-index: 40; padding: 20px; }
 .overlay.hidden { display: none; }
