@@ -23,13 +23,15 @@ function shuffle(arr) {
  */
 class Game {
   constructor(playerList) {
-    // playerList: [{ id, name }]
+    // playerList: [{ id, name, isBot? }]
     this.players = playerList.map((p) => ({
       id: p.id,
       name: p.name,
+      isBot: !!p.isBot,
       hand: [],
       alive: true,
     }));
+    this.botMemory = {}; // botId -> { topCardId, topType } from a recent peek
     this.deck = [];
     this.discard = [];
     this.turnIndex = 0;
@@ -179,6 +181,7 @@ class Game {
       players: this.players.map((p) => ({
         id: p.id,
         name: p.name,
+        isBot: p.isBot,
         alive: p.alive,
         handCount: p.hand.length,
       })),

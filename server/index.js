@@ -34,7 +34,7 @@ function broadcast(code) {
     code: room.code,
     hostId: room.hostId,
     started: !!room.game,
-    players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected })),
+    players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, isBot: !!p.isBot })),
   };
   for (const p of room.players) {
     const payload = { lobby };
@@ -79,6 +79,20 @@ io.on('connection', (socket) => {
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
+  });
+
+  socket.on('addBot', ({ code, playerId }, cb) => {
+    const { error } = manager.addBot(code, playerId);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
+  });
+
+  socket.on('removeBot', ({ code, playerId, botId }, cb) => {
+    const { error } = manager.removeBot(code, playerId, botId);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
   });
 
   socket.on('startGame', ({ code, playerId }, cb) => {

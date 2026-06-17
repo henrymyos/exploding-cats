@@ -82,6 +82,10 @@ h1 { font-size: 2.2rem; margin: 0; }
   display: flex; align-items: center; gap: 10px;
 }
 .player-list .host-tag { margin-left: auto; font-size: .7rem; color: var(--accent2); }
+.player-list .bot-tag { margin-left: auto; font-size: .7rem; color: var(--accent); }
+
+.bot-controls { display: flex; gap: 8px; margin: 10px 0; }
+.bot-controls .btn { margin-top: 0; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); }
 .dot.off { background: #777; }
 

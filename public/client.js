@@ -109,18 +109,37 @@ function renderLobby(lobby) {
   list.innerHTML = '';
   for (const p of lobby.players) {
     const li = document.createElement('li');
-    li.innerHTML = `<span class="dot ${p.connected ? '' : 'off'}"></span>${escapeHtml(p.name)}` +
-      (p.id === lobby.hostId ? '<span class="host-tag">HOST</span>' : '');
+    const icon = p.isBot ? '🤖' : `<span class="dot ${p.connected ? '' : 'off'}"></span>`;
+    const tag = p.id === lobby.hostId ? '<span class="host-tag">HOST</span>'
+      : (p.isBot ? '<span class="bot-tag">BOT</span>' : '');
+    li.innerHTML = `${icon}${escapeHtml(p.name)}${tag}`;
     list.appendChild(li);
   }
   const isHost = lobby.hostId === PLAYER_ID;
   const enough = lobby.players.length >= 2;
+  const full = lobby.players.length >= 5;
+  const botCount = lobby.players.filter((p) => p.isBot).length;
+
+  $('botControls').style.display = isHost ? 'flex' : 'none';
+  $('addBotBtn').disabled = full;
+  $('removeBotBtn').disabled = botCount === 0;
   $('startBtn').style.display = isHost ? 'block' : 'none';
   $('startBtn').disabled = !enough;
   $('lobbyHint').textContent = isHost
-    ? (enough ? 'Everyone in? Hit start!' : 'Waiting for at least 2 players...')
+    ? (enough ? 'Everyone in? Add bots to fill seats, then hit start!' : 'Add a bot or wait for another player (need at least 2)...')
     : 'Waiting for the host to start the game...';
 }
+
+$('addBotBtn').onclick = () => {
+  socket.emit('addBot', { code: state.code, playerId: PLAYER_ID }, (res) => {
+    if (!res.ok) toast(res.error, true);
+  });
+};
+$('removeBotBtn').onclick = () => {
+  socket.emit('removeBot', { code: state.code, playerId: PLAYER_ID }, (res) => {
+    if (!res.ok) toast(res.error, true);
+  });
+};
 
 /* ---------------- game render ---------------- */
 function renderGame(g, lobby) {
@@ -135,7 +154,7 @@ function renderGame(g, lobby) {
     const div = document.createElement('div');
     div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead');
     div.innerHTML =
-      `<div class="opp-avatar">😺</div>` +
+      `<div class="opp-avatar">${p.isBot ? '🤖' : '😺'}</div>` +
       `<div class="opp-name">${escapeHtml(p.name)}</div>` +
       `<div class="opp-cards">🂠 ${p.handCount}</div>`;
     opp.appendChild(div);
