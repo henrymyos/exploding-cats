@@ -164,6 +164,7 @@ function renderGame(g, lobby) {
   }
 
   $('deckCount').textContent = g.deckCount;
+  $('deckLeft').textContent = g.deckCount;
   const dt = $('discardTop');
   if (g.discardTop) {
     dt.className = 'card-mini';
