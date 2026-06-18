@@ -132,6 +132,10 @@ io.on('connection', (socket) => {
     withGame(code, (g) => g.favorGive(playerId, cardId), cb);
   });
 
+  socket.on('stealTake', ({ code, playerId, index }, cb) => {
+    withGame(code, (g) => g.stealTake(playerId, index), cb);
+  });
+
   socket.on('defusePlace', ({ code, playerId, index }, cb) => {
     withGame(code, (g) => g.defusePlace(playerId, index), cb);
   });

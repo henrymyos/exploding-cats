@@ -501,6 +501,13 @@ function renderPending(g, me) {
     showDefuse(p.maxIndex);
   }
 
+  // Steal: I pick a face-down card from the target's hand
+  if (p.kind === 'stealPick' && p.youSteal) {
+    showStealPick(p);
+  } else if (overlayMode === 'steal') {
+    closeOverlay();
+  }
+
   // Draw reveal: I just drew a card — show it big, then Continue ends my turn.
   if (p.kind === 'drawn') {
     if (p.youDrew) showDrawReveal(p.youDrew);
@@ -571,6 +578,29 @@ function showFavorGive(me) {
   $('overlayBox').querySelectorAll('.choice').forEach((btn) => {
     btn.onclick = () => {
       socket.emit('favorGive', { code: state.code, playerId: PLAYER_ID, cardId: btn.dataset.id }, (res) => {
+        if (!res.ok) toast(res.error, true);
+      });
+      closeOverlay();
+    };
+  });
+}
+
+// Blind steal: show the target's face-down fanned hand and pick one to take.
+function showStealPick(p) {
+  if (overlayMode === 'steal') return;
+  overlayMode = 'steal';
+  const n = Math.max(p.stealCount || 0, 0);
+  let backs = '';
+  for (let i = 0; i < n; i += 1) backs += `<button class="pick-back" data-i="${i}" title="Take this card"></button>`;
+  openOverlay(
+    `<h2>🐾 Swipe a card</h2>` +
+    `<p class="hint">${escapeHtml(p.targetName)}'s hand is face-down — pick one to steal!</p>` +
+    `<div class="pick-fan">${backs}</div>`,
+    true
+  );
+  $('overlayBox').querySelectorAll('.pick-back').forEach((btn) => {
+    btn.onclick = () => {
+      socket.emit('stealTake', { code: state.code, playerId: PLAYER_ID, index: Number(btn.dataset.i) }, (res) => {
         if (!res.ok) toast(res.error, true);
       });
       closeOverlay();

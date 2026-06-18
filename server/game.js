@@ -218,6 +218,12 @@ class Game {
     if (p.kind === 'drawn' && p.actorId === playerId) {
       base.youDrew = p.card; // only the drawer sees what they drew
     }
+    if (p.kind === 'stealPick') {
+      const target = this.playerById(p.targetId);
+      base.targetName = target ? target.name : '';
+      base.stealCount = target ? target.hand.length : 0; // face-down cards to pick from
+      if (p.actorId === playerId) base.youSteal = true;
+    }
     if (p.kind === 'stealPick' && p.targetId === playerId && p.mode === 'named') {
       // target doesn't choose for named steal; nothing extra
     }

@@ -211,10 +211,14 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
     return;
   }
   if (a.mode === 'random') {
-    const idx = Math.floor(Math.random() * target.hand.length);
-    const [stolen] = target.hand.splice(idx, 1);
-    actor.hand.push(stolen);
-    this.logMsg(`${actor.name} swiped a random card from ${target.name}.`);
+    // Blind pick: the actor chooses a face-down card from the target's hand.
+    this.pending = {
+      kind: 'stealPick',
+      actorId: actor.id,
+      targetId: target.id,
+      endsAt: Date.now() + 20000,
+      description: `${actor.name} is taking a card from ${target.name}.`,
+    };
   } else {
     // named: take a card of the requested type/cat if present
     const wanted = a.namedType;
@@ -226,6 +230,31 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
       actor.hand.push(stolen);
       this.logMsg(`${actor.name} demanded and took a ${stolen.name} from ${target.name}.`);
     }
+  }
+};
+
+// The actor takes a chosen face-down card from the target's hand.
+Game.prototype.stealTake = function stealTake(playerId, index) {
+  if (!this.pending || this.pending.kind !== 'stealPick') return err('No steal to resolve.');
+  if (this.pending.actorId !== playerId) return err('Not your steal.');
+  const actor = this.playerById(this.pending.actorId);
+  const target = this.playerById(this.pending.targetId);
+  if (!target || target.hand.length === 0) { this.pending = null; this.checkWin(); return ok(); }
+  let i = Number.isInteger(index) ? index : Math.floor(Math.random() * target.hand.length);
+  i = Math.max(0, Math.min(i, target.hand.length - 1));
+  const [stolen] = target.hand.splice(i, 1);
+  actor.hand.push(stolen);
+  this.logMsg(`${actor.name} swiped a card from ${target.name}.`);
+  this.pending = null;
+  this.checkWin();
+  return ok();
+};
+
+Game.prototype.stealAuto = function stealAuto() {
+  if (this.pending && this.pending.kind === 'stealPick') {
+    const target = this.playerById(this.pending.targetId);
+    const n = target ? target.hand.length : 0;
+    this.stealTake(this.pending.actorId, n ? Math.floor(Math.random() * n) : 0);
   }
 };
 
