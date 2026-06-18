@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- explosion burst -->
+  <polygon points="32,1 39,19 58,12 48,30 63,42 43,42 34,63 27,43 6,49 17,31 2,17 24,20"
+           fill="#ffb02e" stroke="#d4452a" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- cat head -->
+  <circle cx="32" cy="33" r="15" fill="#2c2c2c"/>
+  <polygon points="21,24 17,11 31,21" fill="#2c2c2c"/>
+  <polygon points="43,24 47,11 33,21" fill="#2c2c2c"/>
+  <!-- white muzzle -->
+  <ellipse cx="32" cy="38" rx="9" ry="6.5" fill="#ffffff"/>
+  <!-- eyes -->
+  <ellipse cx="26" cy="31" rx="3" ry="4" fill="#ffe14d"/>
+  <ellipse cx="38" cy="31" rx="3" ry="4" fill="#ffe14d"/>
+  <ellipse cx="26" cy="31" rx="1.1" ry="3" fill="#1c1c1c"/>
+  <ellipse cx="38" cy="31" rx="1.1" ry="3" fill="#1c1c1c"/>
+  <!-- nose -->
+  <polygon points="32,36 29,39 35,39" fill="#ff7aa0"/>
+</svg>

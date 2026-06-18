@@ -191,6 +191,7 @@ class RoomManager {
     else if (kind === 'favorPick') game.favorAuto();
     else if (kind === 'defuse') game.defuseAuto();
     else if (kind === 'drawn') game.continueTurnAuto();
+    else if (kind === 'explode') game.applyExplode();
     else if (kind === 'stealPick') game.stealAuto();
     // A resolution can open a NEW pending (e.g. action -> favorPick); chain it.
     this.scheduleResolve(room);
@@ -253,6 +254,10 @@ class RoomManager {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'continue', p.actorId), rand(500, 1000));
       return;
     }
+    if (p && p.kind === 'explode' && this.isBot(g, p.actorId)) {
+      room.botTimer = setTimeout(() => this.runBotJob(room, 'explode', p.actorId), rand(1200, 2000));
+      return;
+    }
     if (p && p.kind === 'stealPick' && this.isBot(g, p.actorId)) {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'steal', p.actorId), rand(700, 1300));
       return;
@@ -296,6 +301,8 @@ class RoomManager {
       }
     } else if (type === 'continue') {
       if (p && p.kind === 'drawn' && p.actorId === botId) g.continueTurn(botId);
+    } else if (type === 'explode') {
+      if (p && p.kind === 'explode' && p.actorId === botId) g.resolveExplode(botId);
     } else if (type === 'steal') {
       if (p && p.kind === 'stealPick' && p.actorId === botId) {
         const target = g.playerById(p.targetId);

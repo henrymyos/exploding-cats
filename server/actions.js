@@ -317,28 +317,16 @@ Game.prototype.drawCard = function drawCard(playerId) {
   if (!card) return err('The deck is empty.');
 
   if (card.type === 'EXPLODE') {
-    const defuse = player.hand.find((c) => c.type === 'DEFUSE');
-    if (defuse) {
-      this.removeCardFromHand(player, defuse.id);
-      this.discard.push(defuse);
-      this.logMsg(`💥 ${player.name} drew an Exploding Cat — and used Catnip!`);
-      this.pending = {
-        kind: 'defuse',
-        actorId: player.id,
-        explodeCard: card,
-        endsAt: Date.now() + 20000,
-        description: `${player.name} is sneaking the Exploding Cat back into the deck.`,
-      };
-      return ok({ exploded: true, defused: true });
-    }
-    // No defuse: the player is out.
-    this.discard.push(card);
-    player.alive = false;
-    this.logMsg(`💥 ${player.name} exploded! They are out of the game.`);
-    this.turnsRemaining = 1;
-    this.nextAlive(1);
-    this.checkWin();
-    return ok({ exploded: true, defused: false });
+    // Reveal the Exploding Cat to everyone first (dramatic pause), then resolve.
+    this.logMsg(`💥 ${player.name} drew an Exploding Cat!`);
+    this.pending = {
+      kind: 'explode',
+      actorId: player.id,
+      explodeCard: card,
+      hasDefuse: player.hand.some((c) => c.type === 'DEFUSE'),
+      endsAt: Date.now() + 6000,
+    };
+    return ok({ exploded: true });
   }
 
   player.hand.push(card);
@@ -352,6 +340,41 @@ Game.prototype.drawCard = function drawCard(playerId) {
     endsAt: Date.now() + 30000,
   };
   return ok({ exploded: false, card });
+};
+
+// After the Exploding Cat has been shown, resolve it: defuse or elimination.
+Game.prototype.resolveExplode = function resolveExplode(playerId) {
+  if (!this.pending || this.pending.kind !== 'explode') return err('Nothing to resolve.');
+  if (playerId && this.pending.actorId !== playerId) return err('Not your explosion.');
+  this.applyExplode();
+  return ok();
+};
+
+Game.prototype.applyExplode = function applyExplode() {
+  if (!this.pending || this.pending.kind !== 'explode') return;
+  const player = this.playerById(this.pending.actorId);
+  const card = this.pending.explodeCard;
+  const defuse = player.hand.find((c) => c.type === 'DEFUSE');
+  if (defuse) {
+    this.removeCardFromHand(player, defuse.id);
+    this.discard.push(defuse);
+    this.logMsg(`😼 ${player.name} used Catnip to defuse it!`);
+    this.pending = {
+      kind: 'defuse',
+      actorId: player.id,
+      explodeCard: card,
+      endsAt: Date.now() + 20000,
+      description: `${player.name} is sneaking the Exploding Cat back into the deck.`,
+    };
+  } else {
+    this.discard.push(card);
+    player.alive = false;
+    this.logMsg(`💥 ${player.name} exploded! They are out of the game.`);
+    this.turnsRemaining = 1;
+    this.nextAlive(1);
+    this.pending = null;
+    this.checkWin();
+  }
 };
 
 // End the turn after reviewing a drawn card.

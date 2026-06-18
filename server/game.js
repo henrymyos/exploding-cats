@@ -218,6 +218,11 @@ class Game {
     if (p.kind === 'drawn' && p.actorId === playerId) {
       base.youDrew = p.card; // only the drawer sees what they drew
     }
+    if (p.kind === 'explode') {
+      base.explodeCard = p.explodeCard; // public — everyone sees the drawn Exploding Cat
+      base.hasDefuse = p.hasDefuse;
+      if (p.actorId === playerId) base.youExploded = true;
+    }
     if (p.kind === 'stealPick') {
       const target = this.playerById(p.targetId);
       base.targetName = target ? target.name : '';

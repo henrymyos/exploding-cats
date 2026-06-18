@@ -209,7 +209,7 @@ function renderGame(g, lobby) {
 let prevDrawnKey = null;
 function handleDrawAnimation(g) {
   const p = g.pending;
-  const key = p && p.kind === 'drawn' ? p.actorId : null;
+  const key = p && (p.kind === 'drawn' || p.kind === 'explode') ? p.actorId : null;
   if (key && key !== prevDrawnKey) {
     // Your own draw flies from the deck to the reveal card on the left;
     // opponents' draws fly from the deck to their seat.
@@ -472,8 +472,9 @@ function renderPending(g, me) {
   const area = $('pendingArea');
   const p = g.pending;
   $('hissBar').classList.add('hidden');
-  // Hide the draw-reveal side panel unless it's my own freshly drawn card.
-  if (!(p && p.kind === 'drawn' && p.youDrew)) hideDrawReveal();
+  // Keep the left side panel for my own drawn card, or anyone's Exploding Cat.
+  const keepReveal = p && ((p.kind === 'drawn' && p.youDrew) || p.kind === 'explode');
+  if (!keepReveal) hideDrawReveal();
   if (!p) { area.textContent = ''; return; }
   area.textContent = p.description || '';
 
@@ -515,6 +516,12 @@ function renderPending(g, me) {
     if (p.youDrew) showDrawReveal(p.youDrew);
     else area.textContent = `${p.actorName} is checking their draw…`;
   }
+
+  // Exploding Cat reveal: shown to everyone on the left before it resolves.
+  if (p.kind === 'explode') {
+    showExplodeReveal(p);
+    area.textContent = `💥 ${p.actorName} drew an Exploding Cat!`;
+  }
 }
 
 let revealShownFor = null;
@@ -544,6 +551,35 @@ function hideDrawReveal() {
   const panel = $('drawReveal');
   if (panel && !panel.classList.contains('hidden')) panel.classList.add('hidden');
   revealShownFor = null;
+}
+
+// Everyone sees the Exploding Cat on the left before it resolves.
+function showExplodeReveal(p) {
+  const panel = $('drawReveal');
+  const key = `explode:${p.actorId}`;
+  if (revealShownFor === key) return;
+  revealShownFor = key;
+  const card = p.explodeCard || { type: 'EXPLODE', name: 'Exploding Cat' };
+  let msg;
+  let btn = '';
+  if (p.youExploded) {
+    msg = p.hasDefuse ? '😼 Quick — defuse it with Catnip!' : '💥 You exploded — you’re out!';
+    btn = `<button class="btn danger" id="explodeContinueBtn">Continue</button>`;
+  } else {
+    msg = `${escapeHtml(p.actorName)} drew it!`;
+  }
+  panel.innerHTML =
+    `<div class="reveal-title">💥 Exploding Cat!</div>` +
+    `<div class="reveal-card"><div class="card" data-type="EXPLODE">${cardFace(card)}</div></div>` +
+    `<p class="hint">${msg}</p>${btn}`;
+  panel.classList.remove('hidden');
+  panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
+  const b = document.getElementById('explodeContinueBtn');
+  if (b) b.onclick = () => {
+    socket.emit('continueExplode', { code: state.code, playerId: PLAYER_ID }, (res) => {
+      if (!res.ok) toast(res.error, true);
+    });
+  };
 }
 
 $('hissBtn').onclick = () => {

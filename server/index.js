@@ -128,6 +128,10 @@ io.on('connection', (socket) => {
     withGame(code, (g) => g.continueTurn(playerId), cb);
   });
 
+  socket.on('continueExplode', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.resolveExplode(playerId), cb);
+  });
+
   socket.on('favorGive', ({ code, playerId, cardId }, cb) => {
     withGame(code, (g) => g.favorGive(playerId, cardId), cb);
   });
