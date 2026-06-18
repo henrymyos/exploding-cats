@@ -92,18 +92,28 @@ h1 { font-size: 2.2rem; margin: 0; }
 /* ---------------- Game table ---------------- */
 #game { flex-direction: column; padding: 8px; }
 
-.table-top { min-height: 110px; }
-.opponents { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; padding-top: 6px; }
+.table-top { min-height: 132px; }
+.opponents { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding-top: 6px; }
 .opp {
-  background: var(--panel); border-radius: 12px; padding: 8px 12px; min-width: 84px; text-align: center;
+  background: var(--panel); border-radius: 12px; padding: 8px 12px 6px; min-width: 96px; text-align: center;
   border: 2px solid transparent; position: relative;
 }
 .opp.active { border-color: var(--accent2); box-shadow: 0 0 16px rgba(255,207,94,.5); }
 .opp.dead { opacity: .4; filter: grayscale(1); }
-.opp .opp-name { font-weight: 600; font-size: .85rem; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.opp .opp-cards { font-size: .75rem; color: var(--muted); }
-.opp .opp-avatar { font-size: 1.6rem; }
-.opp.dead .opp-avatar::after { content: " 💀"; }
+.opp-head { display: flex; align-items: center; justify-content: center; gap: 5px; }
+.opp .opp-name { font-weight: 600; font-size: .85rem; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opp .opp-cards { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.opp .opp-avatar { font-size: 1.4rem; }
+.opp.dead .opp-head .opp-avatar::after { content: " 💀"; }
+/* fan of face-down cards representing an opponent's hand */
+.opp-fan { display: flex; justify-content: center; height: 32px; margin: 5px 0 1px; }
+.mini-back {
+  width: 22px; height: 30px; border-radius: 4px; margin-left: -11px; flex-shrink: 0;
+  background: repeating-linear-gradient(45deg, #5b3a8a, #5b3a8a 4px, #6d49a3 4px, #6d49a3 8px);
+  border: 1px solid var(--accent2); box-shadow: 0 1px 2px rgba(0,0,0,.4);
+}
+.mini-back:first-child { margin-left: 0; }
+.opp.dead .opp-fan { display: none; }
 
 .table-center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; position: relative; }
 .piles { display: flex; gap: 28px; align-items: flex-end; }
@@ -182,10 +192,42 @@ h1 { font-size: 2.2rem; margin: 0; }
 .stack-count { position: absolute; bottom: 8px; right: 8px; background: rgba(18,10,36,.82); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: .72rem; font-weight: 700; z-index: 10; }
 .stack-sel { position: absolute; top: -9px; left: 50%; transform: translateX(-50%); background: var(--accent2); color: #1a1430; border-radius: 10px; padding: 1px 9px; font-size: .68rem; font-weight: 700; z-index: 10; white-space: nowrap; box-shadow: var(--shadow); }
 
-/* big card shown when you draw */
-.reveal-card { display: flex; justify-content: center; margin: 16px 0; }
-.reveal-card .card { width: 188px; height: 264px; cursor: default; }
+/* big card shown when you draw — lives in the left-side panel */
+.reveal-card { display: flex; justify-content: center; margin: 6px 0 2px; }
+.reveal-card .card { width: 156px; height: 220px; cursor: default; }
 .reveal-card .card:hover { transform: none; }
+
+.draw-reveal {
+  position: fixed; left: 22px; top: 50%; transform: translateY(-50%); z-index: 25;
+  background: var(--panel); border-radius: 18px; padding: 16px 16px 18px; box-shadow: var(--shadow);
+  text-align: center; width: 200px;
+}
+.draw-reveal.hidden { display: none; }
+.draw-reveal .reveal-title { color: var(--accent2); font-weight: 700; margin-bottom: 6px; }
+.draw-reveal .btn { margin-top: 12px; }
+.draw-reveal.pop { animation: revealPop .26s ease; }
+@keyframes revealPop {
+  from { transform: translateY(-50%) translateX(-14px) scale(.9); opacity: 0; }
+  to { transform: translateY(-50%) translateX(0) scale(1); opacity: 1; }
+}
+
+/* a face-down card animating from the deck to a hand */
+.flying-card {
+  position: fixed; z-index: 60; border-radius: var(--card-radius); pointer-events: none;
+  background: repeating-linear-gradient(45deg, #5b3a8a, #5b3a8a 8px, #6d49a3 8px, #6d49a3 16px);
+  border: 3px solid var(--accent2); box-shadow: var(--shadow);
+  transition: transform .55s cubic-bezier(.4, .85, .35, 1), opacity .55s ease;
+}
+.flying-card::after { content: "🐱"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 2rem; }
+
+@media (max-width: 720px) {
+  .draw-reveal { left: 50%; top: auto; bottom: calc(46vh + 8px); transform: translateX(-50%); width: 168px; padding: 10px; }
+  .draw-reveal .reveal-card .card { width: 120px; height: 168px; }
+  @keyframes revealPop {
+    from { transform: translateX(-50%) scale(.9); opacity: 0; }
+    to { transform: translateX(-50%) scale(1); opacity: 1; }
+  }
+}
 
 /* ---------------- Overlay / modal ---------------- */
 .overlay { position: fixed; inset: 0; background: rgba(10,6,24,.78); display: grid; place-items: center; z-index: 40; padding: 20px; }

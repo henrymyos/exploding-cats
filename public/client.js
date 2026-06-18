@@ -149,17 +149,22 @@ function renderGame(g, lobby) {
   if (me) me.hand = g.hand || [];
   const isMyTurn = g.turnPlayerId === PLAYER_ID;
 
-  // opponents (everyone but me)
+  // opponents (everyone but me) — show a fan of card backs for their hand
   const opp = $('opponents');
   opp.innerHTML = '';
   for (const p of g.players) {
     if (p.id === PLAYER_ID) continue;
     const div = document.createElement('div');
     div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead');
+    div.dataset.id = p.id;
+    const fanCount = Math.min(p.handCount, 8);
+    let fan = '';
+    for (let i = 0; i < fanCount; i += 1) fan += '<span class="mini-back"></span>';
     div.innerHTML =
-      `<div class="opp-avatar">${p.isBot ? '🤖' : '😺'}</div>` +
-      `<div class="opp-name">${escapeHtml(p.name)}</div>` +
-      `<div class="opp-cards">🂠 ${p.handCount}</div>`;
+      `<div class="opp-head"><span class="opp-avatar">${p.isBot ? '🤖' : '😺'}</span>` +
+      `<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
+      `<div class="opp-fan">${fan}</div>` +
+      `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
     opp.appendChild(div);
   }
 
@@ -195,6 +200,50 @@ function renderGame(g, lobby) {
   renderHand(g, me, isMyTurn);
   renderPending(g, me);
   renderLog(g.log);
+  handleDrawAnimation(g);
+}
+
+/* ---------------- draw animation (card flies from the deck) ---------------- */
+let prevDrawnKey = null;
+function handleDrawAnimation(g) {
+  const p = g.pending;
+  const key = p && p.kind === 'drawn' ? p.actorId : null;
+  if (key && key !== prevDrawnKey) {
+    if (key === PLAYER_ID) {
+      flyCard($('hand'));
+    } else {
+      const oppEl = document.querySelector(`.opp[data-id="${cssId(key)}"]`);
+      if (oppEl) flyCard(oppEl);
+    }
+  }
+  prevDrawnKey = key;
+}
+
+function cssId(id) {
+  return String(id).replace(/"/g, '\\"');
+}
+
+// Animate a face-down card from the draw pile to a target element.
+function flyCard(toEl) {
+  const pile = $('drawPile');
+  if (!pile || !toEl) return;
+  const from = pile.getBoundingClientRect();
+  const to = toEl.getBoundingClientRect();
+  const fly = document.createElement('div');
+  fly.className = 'flying-card';
+  fly.style.left = `${from.left}px`;
+  fly.style.top = `${from.top}px`;
+  fly.style.width = `${from.width}px`;
+  fly.style.height = `${from.height}px`;
+  document.body.appendChild(fly);
+  // force layout so the transition runs
+  // eslint-disable-next-line no-unused-expressions
+  fly.getBoundingClientRect();
+  const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
+  const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
+  fly.style.transform = `translate(${dx}px, ${dy}px) scale(.45) rotate(10deg)`;
+  fly.style.opacity = '0.25';
+  setTimeout(() => fly.remove(), 620);
 }
 
 // Display order for grouping the hand.
@@ -396,6 +445,8 @@ function renderPending(g, me) {
   const area = $('pendingArea');
   const p = g.pending;
   $('hissBar').classList.add('hidden');
+  // Hide the draw-reveal side panel unless it's my own freshly drawn card.
+  if (!(p && p.kind === 'drawn' && p.youDrew)) hideDrawReveal();
   if (!p) { area.textContent = ''; return; }
   area.textContent = p.description || '';
 
@@ -432,21 +483,30 @@ function renderPending(g, me) {
   }
 }
 
+let revealShownFor = null;
 function showDrawReveal(card) {
-  if (overlayMode === 'reveal') return;
-  overlayMode = 'reveal';
-  openOverlay(
-    `<h2>You drew…</h2>` +
+  const panel = $('drawReveal');
+  if (revealShownFor === card.id) return; // already showing this draw
+  revealShownFor = card.id;
+  panel.innerHTML =
+    `<div class="reveal-title">You drew…</div>` +
     `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
-    `<button class="btn primary" id="drawContinueBtn">Continue → end turn</button>`,
-    true
-  );
+    `<button class="btn primary" id="drawContinueBtn">Continue → end turn</button>`;
+  panel.classList.remove('hidden');
+  // small entrance animation
+  panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
   $('drawContinueBtn').onclick = () => {
     socket.emit('continueTurn', { code: state.code, playerId: PLAYER_ID }, (res) => {
       if (!res.ok) toast(res.error, true);
     });
-    closeOverlay();
+    hideDrawReveal();
   };
+}
+
+function hideDrawReveal() {
+  const panel = $('drawReveal');
+  if (panel && !panel.classList.contains('hidden')) panel.classList.add('hidden');
+  revealShownFor = null;
 }
 
 $('hissBtn').onclick = () => {
