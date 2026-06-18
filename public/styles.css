@@ -237,7 +237,8 @@ h1 { font-size: 2.2rem; margin: 0; }
 .reveal-card .card:hover { transform: none; }
 
 .draw-reveal {
-  position: fixed; left: 26px; top: 50%; transform: translateY(-50%); z-index: 25;
+  /* centered within the left half of the screen (25% across) */
+  position: fixed; left: 25%; top: 50%; transform: translate(-50%, -50%); z-index: 25;
   background: var(--panel); border-radius: 18px; padding: 18px 18px 20px; box-shadow: var(--shadow);
   text-align: center; width: 228px;
 }
@@ -246,8 +247,8 @@ h1 { font-size: 2.2rem; margin: 0; }
 .draw-reveal .btn { margin-top: 12px; }
 .draw-reveal.pop { animation: revealPop .26s ease; }
 @keyframes revealPop {
-  from { transform: translateY(-50%) translateX(-14px) scale(.9); opacity: 0; }
-  to { transform: translateY(-50%) translateX(0) scale(1); opacity: 1; }
+  from { transform: translate(-50%, -50%) scale(.85); opacity: 0; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
 /* a face-down card animating from the deck to a hand */
