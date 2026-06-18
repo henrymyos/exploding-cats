@@ -26,6 +26,25 @@ html, body {
 
 #app { height: 100%; position: relative; }
 
+/* screen shake + red flash when someone explodes */
+#app.shake { animation: shake .6s cubic-bezier(.36, .07, .19, .97); }
+@keyframes shake {
+  10%, 90% { transform: translate(-2px, 1px); }
+  20%, 80% { transform: translate(5px, -2px); }
+  30%, 50%, 70% { transform: translate(-8px, 3px); }
+  40%, 60% { transform: translate(8px, -3px); }
+}
+.boom {
+  position: fixed; inset: 0; z-index: 70; pointer-events: none; opacity: 0;
+  background: radial-gradient(circle at 50% 45%, rgba(255,120,40,.55), rgba(178,31,31,.65) 60%, rgba(178,31,31,.0) 100%);
+}
+.boom.on { animation: boomFlash .6s ease-out; }
+@keyframes boomFlash {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 .screen { display: none; height: 100%; }
 .screen.active { display: flex; }
 

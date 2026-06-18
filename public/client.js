@@ -202,6 +202,27 @@ function renderGame(g, lobby) {
   renderLog(g.log);
   handleDrawAnimation(g);
   handleDiscardAnimation(g);
+  handleExplodeShake(g);
+}
+
+/* ---------------- explosion shake ---------------- */
+let prevAlive = null;
+function handleExplodeShake(g) {
+  const aliveNow = {};
+  g.players.forEach((p) => { aliveNow[p.id] = p.alive; });
+  if (prevAlive) {
+    const someoneDied = g.players.some((p) => prevAlive[p.id] === true && p.alive === false);
+    if (someoneDied) screenShake();
+  }
+  prevAlive = aliveNow;
+}
+
+function screenShake() {
+  const app = $('app') || document.body;
+  app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
+  setTimeout(() => app.classList.remove('shake'), 650);
+  const boom = $('boom');
+  if (boom) { boom.classList.remove('on'); void boom.offsetWidth; boom.classList.add('on'); setTimeout(() => boom.classList.remove('on'), 650); }
 }
 
 /* ---------------- table animations ---------------- */
