@@ -84,9 +84,9 @@ class Game {
 
     shuffle(deck);
 
-    // Deal 7 cards (no Exploding Cats yet) + 1 Defuse to each player.
+    // Deal 4 cards (no Exploding Cats yet) + 1 Catnip each = 5 cards to start.
     for (const player of this.players) {
-      player.hand = deck.splice(0, 7);
+      player.hand = deck.splice(0, 4);
       player.hand.push(defusePool.pop());
     }
 
