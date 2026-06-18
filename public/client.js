@@ -203,6 +203,64 @@ function renderGame(g, lobby) {
   handleDrawAnimation(g);
   handleDiscardAnimation(g);
   handleExplodeShake(g);
+  if (g.phase === 'finished') showVictory(g, lobby);
+  else hideVictory();
+}
+
+/* ---------------- victory celebration + game-over menu ---------------- */
+const CONFETTI_COLORS = ['#ff5e8a', '#ffcf5e', '#5ee0a8', '#7aa8ff', '#d99bff', '#ff8f6b'];
+let victoryShown = false;
+function showVictory(g, lobby) {
+  if (victoryShown) return;
+  victoryShown = true;
+  const v = $('victory');
+  const winner = g.players.find((p) => p.id === g.winnerId);
+  const youWon = winner && winner.id === PLAYER_ID;
+  const isHost = lobby && lobby.hostId === PLAYER_ID;
+  const hostName = lobby ? (lobby.players.find((p) => p.id === lobby.hostId) || {}).name : '';
+
+  let confetti = '';
+  for (let i = 0; i < 70; i += 1) {
+    const left = Math.floor(Math.random() * 100);
+    const delay = (Math.random() * 2.5).toFixed(2);
+    const dur = (2.2 + Math.random() * 2).toFixed(2);
+    const color = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    confetti += `<span class="confetti" style="left:${left}%;background:${color};animation-delay:${delay}s;animation-duration:${dur}s"></span>`;
+  }
+
+  const buttons = isHost
+    ? `<button class="btn primary" id="playAgainBtn">🔄 Play again (same crew)</button>` +
+      `<button class="btn" id="vicHomeBtn">🏠 Back to home</button>`
+    : `<p class="hint">Waiting for ${escapeHtml(hostName || 'the host')} to start a new game…</p>` +
+      `<button class="btn" id="vicHomeBtn">🏠 Leave</button>`;
+
+  v.innerHTML =
+    `<div class="confetti-layer">${confetti}</div>` +
+    `<div class="victory-box">` +
+      `<div class="trophy">🏆</div>` +
+      `<h1>${youWon ? 'You win!' : escapeHtml((winner && winner.name) || 'Game over')}${youWon || !winner ? '' : ' wins!'}</h1>` +
+      `<div class="victory-sub">last cat standing</div>` +
+      buttons +
+    `</div>`;
+  v.classList.remove('hidden');
+
+  const pa = $('playAgainBtn');
+  if (pa) pa.onclick = () => {
+    socket.emit('playAgain', { code: state.code, playerId: PLAYER_ID }, (res) => {
+      if (!res.ok) toast(res.error, true);
+    });
+  };
+  const home = $('vicHomeBtn');
+  if (home) home.onclick = () => {
+    socket.emit('leaveGame', { code: state.code, playerId: PLAYER_ID }, () => {});
+    goHome();
+  };
+}
+
+function hideVictory() {
+  const v = $('victory');
+  if (v && !v.classList.contains('hidden')) v.classList.add('hidden');
+  victoryShown = false;
 }
 
 /* ---------------- explosion shake ---------------- */

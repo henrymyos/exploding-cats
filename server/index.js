@@ -167,6 +167,13 @@ io.on('connection', (socket) => {
     broadcast(code);
   });
 
+  socket.on('playAgain', ({ code, playerId }, cb) => {
+    const { error } = manager.playAgain(code, playerId);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
+  });
+
   socket.on('disconnect', () => {
     const info = socketIndex.get(socket.id);
     if (info) {

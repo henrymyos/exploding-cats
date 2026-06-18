@@ -118,6 +118,23 @@ class RoomManager {
     return { room };
   }
 
+  // Host starts a fresh game with the same crew (bots + still-connected humans).
+  playAgain(code, playerId) {
+    const room = this.getRoom(code);
+    if (!room) return { error: 'Room not found.' };
+    if (room.hostId !== playerId) return { error: 'Only the host can restart.' };
+    // keep bots and connected humans; drop anyone who left/disconnected
+    room.players = room.players.filter((p) => p.isBot || p.connected);
+    if (room.players.length < MIN_PLAYERS) return { error: 'Need at least 2 players to play again.' };
+    if (!room.players.find((p) => p.id === room.hostId)) room.hostId = room.players[0].id;
+    if (room.timer) { clearTimeout(room.timer); room.timer = null; }
+    if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
+    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
+    this.scheduleResolve(room);
+    this.scheduleBots(room);
+    return { room };
+  }
+
   destroyRoom(code) {
     const room = this.getRoom(code);
     if (room && room.timer) clearTimeout(room.timer);

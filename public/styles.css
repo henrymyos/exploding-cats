@@ -45,6 +45,26 @@ html, body {
   100% { opacity: 0; }
 }
 
+/* ---------------- victory celebration ---------------- */
+.victory { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px;
+  background: radial-gradient(circle at 50% 40%, rgba(58,47,102,.92), rgba(10,6,24,.94)); overflow: hidden; }
+.victory.hidden { display: none; }
+.victory-box { position: relative; z-index: 2; text-align: center; background: var(--panel); border-radius: 22px;
+  padding: 28px 26px; box-shadow: var(--shadow); width: min(380px, 100%); animation: vicPop .4s cubic-bezier(.2,1.3,.4,1); }
+.victory-box h1 { margin: 6px 0 2px; font-size: 2rem; color: var(--accent2); }
+.victory-box .victory-sub { color: var(--muted); text-transform: uppercase; letter-spacing: 2px; font-size: .72rem; margin-bottom: 18px; }
+.victory-box .trophy { font-size: 4.5rem; line-height: 1; animation: trophyBounce 1.2s ease-in-out infinite; }
+.victory-box .btn { margin-top: 10px; }
+@keyframes vicPop { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes trophyBounce { 0%,100% { transform: translateY(0) rotate(-4deg); } 50% { transform: translateY(-12px) rotate(4deg); } }
+.confetti-layer { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+.confetti { position: absolute; top: -20px; width: 10px; height: 14px; border-radius: 2px; opacity: .9;
+  animation-name: confettiFall; animation-timing-function: linear; animation-iteration-count: infinite; }
+@keyframes confettiFall {
+  0% { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(102vh) rotate(720deg); opacity: .9; }
+}
+
 .screen { display: none; height: 100%; }
 .screen.active { display: flex; }
 
