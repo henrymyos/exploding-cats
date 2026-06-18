@@ -201,49 +201,74 @@ function renderGame(g, lobby) {
   renderPending(g, me);
   renderLog(g.log);
   handleDrawAnimation(g);
+  handleDiscardAnimation(g);
 }
 
-/* ---------------- draw animation (card flies from the deck) ---------------- */
+/* ---------------- table animations ---------------- */
+// A face-down card flies from the deck to whoever just drew.
 let prevDrawnKey = null;
 function handleDrawAnimation(g) {
   const p = g.pending;
   const key = p && p.kind === 'drawn' ? p.actorId : null;
   if (key && key !== prevDrawnKey) {
-    if (key === PLAYER_ID) {
-      flyCard($('hand'));
-    } else {
-      const oppEl = document.querySelector(`.opp[data-id="${cssId(key)}"]`);
-      if (oppEl) flyCard(oppEl);
-    }
+    const target = key === PLAYER_ID ? $('hand') : document.querySelector(`.opp[data-id="${cssId(key)}"]`);
+    flyCard($('drawPile'), target); // face-down from the deck
   }
   prevDrawnKey = key;
+}
+
+// A face-up card flies from the player to the discard pile when one is played.
+let prevDiscardCount = null;
+function handleDiscardAnimation(g) {
+  const dc = g.discardCount || 0;
+  if (prevDiscardCount !== null && dc > prevDiscardCount && g.discardTop) {
+    flyCard(discardSourceEl(g), $('discardTop'), g.discardTop);
+  }
+  prevDiscardCount = dc;
+}
+
+// Best guess at who just discarded a card, so it flies from their position.
+function discardSourceEl(g) {
+  const p = g.pending;
+  const id = p && (p.kind === 'action' || p.kind === 'defuse') ? p.actorId : g.turnPlayerId;
+  if (id === PLAYER_ID) return $('hand');
+  return document.querySelector(`.opp[data-id="${cssId(id)}"]`) || $('hand');
 }
 
 function cssId(id) {
   return String(id).replace(/"/g, '\\"');
 }
 
-// Animate a face-down card from the draw pile to a target element.
-function flyCard(toEl) {
-  const pile = $('drawPile');
-  if (!pile || !toEl) return;
-  const from = pile.getBoundingClientRect();
+// Animate a card from one element to another. With faceCard it flies face-up
+// (a played card heading to the discard); without, it's a face-down draw.
+function flyCard(fromEl, toEl, faceCard) {
+  if (!fromEl || !toEl) return;
+  const from = fromEl.getBoundingClientRect();
   const to = toEl.getBoundingClientRect();
+  if (!from.width || !to.width) return; // elements not visible yet
+  const w = 104, h = 146;
   const fly = document.createElement('div');
-  fly.className = 'flying-card';
-  fly.style.left = `${from.left}px`;
-  fly.style.top = `${from.top}px`;
-  fly.style.width = `${from.width}px`;
-  fly.style.height = `${from.height}px`;
+  fly.className = 'flying-card' + (faceCard ? ' faceup' : '');
+  fly.style.width = `${w}px`;
+  fly.style.height = `${h}px`;
+  fly.style.left = `${from.left + from.width / 2 - w / 2}px`;
+  fly.style.top = `${from.top + from.height / 2 - h / 2}px`;
+  if (faceCard) {
+    fly.innerHTML = `<div class="card" data-type="${faceCard.type}" style="width:100%;height:100%">${cardFace(faceCard)}</div>`;
+  }
   document.body.appendChild(fly);
   // force layout so the transition runs
   // eslint-disable-next-line no-unused-expressions
   fly.getBoundingClientRect();
   const dx = (to.left + to.width / 2) - (from.left + from.width / 2);
   const dy = (to.top + to.height / 2) - (from.top + from.height / 2);
-  fly.style.transform = `translate(${dx}px, ${dy}px) scale(.45) rotate(10deg)`;
-  fly.style.opacity = '0.25';
-  setTimeout(() => fly.remove(), 620);
+  if (faceCard) {
+    fly.style.transform = `translate(${dx}px, ${dy}px) scale(.78) rotate(-5deg)`;
+  } else {
+    fly.style.transform = `translate(${dx}px, ${dy}px) scale(.45) rotate(10deg)`;
+    fly.style.opacity = '0.25';
+  }
+  setTimeout(() => fly.remove(), 600);
 }
 
 // Display order for grouping the hand.

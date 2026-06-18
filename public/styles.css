@@ -219,6 +219,10 @@ h1 { font-size: 2.2rem; margin: 0; }
   transition: transform .55s cubic-bezier(.4, .85, .35, 1), opacity .55s ease;
 }
 .flying-card::after { content: "🐱"; position: absolute; inset: 0; display: grid; place-items: center; font-size: 2rem; }
+/* face-up version (a played card heading to the discard) shows the real card */
+.flying-card.faceup { background: none; border: none; box-shadow: none; }
+.flying-card.faceup::after { content: none; }
+.flying-card.faceup .card { cursor: default; }
 
 @media (max-width: 720px) {
   .draw-reveal { left: 50%; top: auto; bottom: calc(46vh + 8px); transform: translateX(-50%); width: 168px; padding: 10px; }
