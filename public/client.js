@@ -211,7 +211,9 @@ function handleDrawAnimation(g) {
   const p = g.pending;
   const key = p && p.kind === 'drawn' ? p.actorId : null;
   if (key && key !== prevDrawnKey) {
-    const target = key === PLAYER_ID ? $('hand') : document.querySelector(`.opp[data-id="${cssId(key)}"]`);
+    // Your own draw flies from the deck to the reveal card on the left;
+    // opponents' draws fly from the deck to their seat.
+    const target = key === PLAYER_ID ? $('drawReveal') : document.querySelector(`.opp[data-id="${cssId(key)}"]`);
     flyCard($('drawPile'), target); // face-down from the deck
   }
   prevDrawnKey = key;
@@ -528,6 +530,9 @@ function showDrawReveal(card) {
   // small entrance animation
   panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
   $('drawContinueBtn').onclick = () => {
+    // fly the card from the left panel into your hand
+    const cardEl = panel.querySelector('.reveal-card .card');
+    if (cardEl) flyCard(cardEl, $('hand'), card);
     socket.emit('continueTurn', { code: state.code, playerId: PLAYER_ID }, (res) => {
       if (!res.ok) toast(res.error, true);
     });
