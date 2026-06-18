@@ -367,9 +367,11 @@ Game.prototype.applyExplode = function applyExplode() {
       description: `${player.name} is sneaking the Exploding Cat back into the deck.`,
     };
   } else {
-    this.discard.push(card);
+    // No defuse — they're out, and their whole hand goes to the discard pile.
+    while (player.hand.length) this.discard.push(player.hand.pop());
+    this.discard.push(card); // the Exploding Cat lands on top
     player.alive = false;
-    this.logMsg(`💥 ${player.name} exploded! They are out of the game.`);
+    this.logMsg(`💥 ${player.name} exploded! They are out — their cards go to the discard pile.`);
     this.turnsRemaining = 1;
     this.nextAlive(1);
     this.pending = null;
