@@ -496,7 +496,7 @@ function promptTarget(me, g, sel, mode) {
   const opps = aliveOpponents(g);
   if (opps.length === 0) return toast('No one to target.', true);
   openOverlay(`
-    <h2>${mode === 'favor' ? 'Beg from whom?' : 'Steal from whom?'}</h2>
+    <h2>${mode === 'favor' ? 'Ask a favor from whom?' : 'Steal from whom?'}</h2>
     <div class="choice-grid">
       ${opps.map((p) => `<button class="choice" data-id="${p.id}">😺<br>${escapeHtml(p.name)}<br><span class="hint">${p.handCount} cards</span></button>`).join('')}
     </div>
@@ -525,9 +525,9 @@ function promptNamed(me, g, sel) {
       const targetId = btn.dataset.id;
       // step 2: which card type
       const types = [
-        { v: 'DEFUSE', n: 'Catnip' }, { v: 'NOPE', n: 'Hiss' }, { v: 'ATTACK', n: 'Pounce' },
-        { v: 'SKIP', n: 'Scamper' }, { v: 'FAVOR', n: 'Beg' }, { v: 'SHUFFLE', n: 'Knock Off' },
-        { v: 'FUTURE', n: 'Curious Peek' },
+        { v: 'DEFUSE', n: 'Defuse' }, { v: 'NOPE', n: 'Nope' }, { v: 'ATTACK', n: 'Attack' },
+        { v: 'SKIP', n: 'Skip' }, { v: 'FAVOR', n: 'Favor' }, { v: 'SHUFFLE', n: 'Shuffle' },
+        { v: 'FUTURE', n: 'See the Future' },
         ...CATS.map((c) => ({ v: c.id, n: c.name })),
       ];
       openOverlay(`
@@ -561,7 +561,7 @@ function renderPending(g, me) {
   if (p.kind === 'action' && me && me.alive) {
     const hasHiss = me.hand.some((c) => c.type === 'NOPE');
     if (hasHiss) {
-      $('hissText').textContent = p.noped ? 'Action HISSED — counter it?' : (p.description || 'An action is happening!');
+      $('hissText').textContent = p.noped ? 'Action NOPED — counter it?' : (p.description || 'An action is happening!');
       $('hissBar').classList.remove('hidden');
     }
   }
@@ -599,7 +599,7 @@ function renderPending(g, me) {
   // Exploding Cat reveal: shown to everyone on the left before it resolves.
   if (p.kind === 'explode') {
     showExplodeReveal(p);
-    area.textContent = `💥 ${p.actorName} drew an Exploding Cat!`;
+    area.textContent = `💥 ${p.actorName} drew an Exploding Kitten!`;
   }
 }
 
@@ -638,17 +638,17 @@ function showExplodeReveal(p) {
   const key = `explode:${p.actorId}`;
   if (revealShownFor === key) return;
   revealShownFor = key;
-  const card = p.explodeCard || { type: 'EXPLODE', name: 'Exploding Cat' };
+  const card = p.explodeCard || { type: 'EXPLODE', name: 'Exploding Kitten' };
   let msg;
   let btn = '';
   if (p.youExploded) {
-    msg = p.hasDefuse ? '😼 Quick — defuse it with Catnip!' : '💥 You exploded — you’re out!';
+    msg = p.hasDefuse ? '😼 Quick — play your Defuse!' : '💥 You exploded — you’re out!';
     btn = `<button class="btn danger" id="explodeContinueBtn">Continue</button>`;
   } else {
     msg = `${escapeHtml(p.actorName)} drew it!`;
   }
   panel.innerHTML =
-    `<div class="reveal-title">💥 Exploding Cat!</div>` +
+    `<div class="reveal-title">💥 Exploding Kitten!</div>` +
     `<div class="reveal-card"><div class="card" data-type="EXPLODE">${cardFace(card)}</div></div>` +
     `<p class="hint">${msg}</p>${btn}`;
   panel.classList.remove('hidden');
@@ -672,7 +672,7 @@ function showFuture(cards) {
   if (overlayMode === 'future') return; // already showing
   overlayMode = 'future';
   openOverlay(`
-    <h2>🔮 Curious Peek</h2>
+    <h2>🔮 See the Future</h2>
     <p class="hint">Top of the deck (next to be drawn on the left):</p>
     <div class="future-row">
       ${cards.map((c, i) => `<div><div class="card" data-type="${c.type}">${cardFace(c)}</div><div class="label">${i === 0 ? 'next' : '#' + (i + 1)}</div></div>`).join('')}
@@ -739,7 +739,7 @@ function showDefuse(maxIndex) {
   options.push({ label: 'Random', idx: -1 });
   openOverlay(`
     <h2>🧨 Defused!</h2>
-    <p class="hint">Sneak the Exploding Cat back where the others won't expect it:</p>
+    <p class="hint">Sneak the Exploding Kitten back where the others won't expect it:</p>
     <div class="choice-grid">
       ${options.map((o) => `<button class="choice" data-idx="${o.idx}">${o.label}</button>`).join('')}
     </div>

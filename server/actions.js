@@ -51,9 +51,9 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
   if (cards.length !== 1) return err('You can only play one action card at a time.');
   const card = cards[0];
 
-  if (card.type === 'DEFUSE') return err('Catnip can only be used when you draw an Exploding Cat.');
+  if (card.type === 'DEFUSE') return err('Defuse can only be used when you draw an Exploding Kitten.');
   if (card.type === 'EXPLODE') return err('You cannot play that.');
-  if (card.type === 'NOPE') return err('A Hiss can only interrupt another action.');
+  if (card.type === 'NOPE') return err('A Nope can only interrupt another action.');
   if (!ACTIONABLE.has(card.type)) return err('That card has no solo action.');
 
   // FAVOR needs a target.
@@ -126,19 +126,19 @@ Game.prototype.playCatCombo = function playCatCombo(player, cards, opts) {
 // ------------------------------------------------------------------
 
 Game.prototype.playNope = function playNope(playerId) {
-  if (!this.pending || this.pending.kind !== 'action') return err('Nothing to Hiss at right now.');
+  if (!this.pending || this.pending.kind !== 'action') return err('Nothing to Nope right now.');
   const player = this.playerById(playerId);
   if (!player || !player.alive) return err('You are out of the game.');
 
   const card = player.hand.find((c) => c.type === 'NOPE');
-  if (!card) return err('You have no Hiss card.');
+  if (!card) return err('You have no Nope card.');
 
   this.removeCardFromHand(player, card.id);
   this.discard.push(card);
   this.pending.nopes.push(playerId);
-  this.pending.endsAt = Date.now() + NOPE_WINDOW_MS; // reopen the window for a counter-Hiss
+  this.pending.endsAt = Date.now() + NOPE_WINDOW_MS; // reopen the window for a counter-Nope
   const state = this.pending.nopes.length % 2 === 1 ? 'cancelled' : 'back on';
-  this.logMsg(`${player.name} hissed! The action is now ${state}.`);
+  this.logMsg(`${player.name} played Nope! The action is now ${state}.`);
   return ok({ window: true });
 };
 
@@ -153,7 +153,7 @@ Game.prototype.resolveAction = function resolveAction() {
 
   // Odd number of Hisses => the action is cancelled.
   if (p.nopes.length % 2 === 1) {
-    this.logMsg(`${actor ? actor.name : 'The'} action was cancelled by a Hiss.`);
+    this.logMsg(`${actor ? actor.name : 'The'} action was cancelled by a Nope.`);
     this.pending = null;
     return;
   }
@@ -317,8 +317,8 @@ Game.prototype.drawCard = function drawCard(playerId) {
   if (!card) return err('The deck is empty.');
 
   if (card.type === 'EXPLODE') {
-    // Reveal the Exploding Cat to everyone first (dramatic pause), then resolve.
-    this.logMsg(`💥 ${player.name} drew an Exploding Cat!`);
+    // Reveal the Exploding Kitten to everyone first (dramatic pause), then resolve.
+    this.logMsg(`💥 ${player.name} drew an Exploding Kitten!`);
     this.pending = {
       kind: 'explode',
       actorId: player.id,
@@ -358,13 +358,13 @@ Game.prototype.applyExplode = function applyExplode() {
   if (defuse) {
     this.removeCardFromHand(player, defuse.id);
     this.discard.push(defuse);
-    this.logMsg(`😼 ${player.name} used Catnip to defuse it!`);
+    this.logMsg(`😼 ${player.name} played a Defuse and survived!`);
     this.pending = {
       kind: 'defuse',
       actorId: player.id,
       explodeCard: card,
       endsAt: Date.now() + 20000,
-      description: `${player.name} is sneaking the Exploding Cat back into the deck.`,
+      description: `${player.name} is sneaking the Exploding Kitten back into the deck.`,
     };
   } else {
     // No defuse — they're out, and their whole hand goes to the discard pile.
@@ -406,7 +406,7 @@ Game.prototype.defusePlace = function defusePlace(playerId, index) {
   // index 0 = top of deck. Our deck array has the top at the END, so convert.
   const insertAt = this.deck.length - i;
   this.deck.splice(insertAt, 0, card);
-  this.logMsg(`The Exploding Cat is back in the deck somewhere...`);
+  this.logMsg(`The Exploding Kitten is back in the deck somewhere...`);
   this.pending = null;
   this.advanceTurn();
   this.checkWin();
