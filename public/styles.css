@@ -273,6 +273,26 @@ h1 { font-size: 2.2rem; margin: 0; }
 .flying-card.faceup::after { content: none; }
 .flying-card.faceup .card { cursor: default; }
 
+/* deck shuffle: card backs fan out from the pile and snap back together */
+.shuffle-card {
+  position: fixed; z-index: 58; border-radius: var(--card-radius); pointer-events: none;
+  background: repeating-linear-gradient(45deg, #5b3a8a, #5b3a8a 8px, #6d49a3 8px, #6d49a3 16px);
+  border: 3px solid var(--accent2); box-shadow: var(--shadow);
+  animation: shuffleFly .85s ease-in-out forwards;
+}
+@keyframes shuffleFly {
+  0% { transform: translate(0, 0) rotate(0); opacity: 0; }
+  20% { opacity: 1; }
+  50% { transform: translate(var(--dx), var(--dy)) rotate(var(--rot)); opacity: 1; }
+  100% { transform: translate(0, 0) rotate(0); opacity: 0; }
+}
+.pile-back.shuffling { animation: pileShuffle .8s ease-in-out; }
+@keyframes pileShuffle {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  30% { transform: translateY(-5px) rotate(-4deg); }
+  70% { transform: translateY(-5px) rotate(4deg); }
+}
+
 @media (max-width: 720px) {
   .draw-reveal { left: 50%; top: auto; bottom: calc(46vh + 8px); transform: translateX(-50%); width: 168px; padding: 10px; }
   .draw-reveal .reveal-card .card { width: 120px; height: 168px; }

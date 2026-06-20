@@ -45,6 +45,7 @@ class Game {
     this.transferSeq = 0;     // increments on each card stolen/given
     this.lastTransfer = null; // { seq, card, fromId, toId, fromName, toName }
     this.lastDiscardBy = null; // id of whoever most recently sent a card to the discard
+    this.shuffleSeq = 0;       // increments each time the draw pile is shuffled in play
     this.deal();
   }
 
@@ -193,6 +194,7 @@ class Game {
       pending: this.publicPending(playerId),
       transfer: this.transferFor(playerId),
       lastDiscardBy: this.lastDiscardBy,
+      shuffleSeq: this.shuffleSeq,
       log: this.log.slice(-30),
     };
   }

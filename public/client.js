@@ -204,6 +204,7 @@ function renderGame(g, lobby) {
   handleDiscardAnimation(g);
   handleExplodeShake(g);
   handleTransfer(g);
+  handleShuffle(g);
   if (g.phase === 'finished') showVictory(g, lobby);
   else hideVictory();
 }
@@ -382,6 +383,44 @@ function flyCard(fromEl, toEl, faceCard) {
     fly.style.opacity = '0.25';
   }
   setTimeout(() => fly.remove(), 600);
+}
+
+// Play a riffle animation on the draw pile whenever the deck is shuffled.
+let shuffleStarted = false;
+let lastShuffleSeq = 0;
+function handleShuffle(g) {
+  const seq = g.shuffleSeq || 0;
+  if (!shuffleStarted || seq < lastShuffleSeq) { shuffleStarted = true; lastShuffleSeq = seq; return; }
+  if (seq > lastShuffleSeq) { lastShuffleSeq = seq; shuffleAnimation(); }
+}
+
+function shuffleAnimation() {
+  const pile = $('drawPile');
+  const back = pile && pile.querySelector('.pile-back');
+  if (!back) return;
+  const r = back.getBoundingClientRect();
+  if (!r.width) return;
+  const cx = r.left + r.width / 2;
+  const cy = r.top + r.height / 2;
+  // card backs that fan out and snap back together
+  const offsets = [[-72, -16, -16], [72, -16, 16], [-54, 16, -11], [54, 16, 11], [-26, -28, -6], [26, 28, 7]];
+  offsets.forEach((o, i) => {
+    const el = document.createElement('div');
+    el.className = 'shuffle-card';
+    el.style.width = `${r.width}px`;
+    el.style.height = `${r.height}px`;
+    el.style.left = `${cx - r.width / 2}px`;
+    el.style.top = `${cy - r.height / 2}px`;
+    el.style.setProperty('--dx', `${o[0]}px`);
+    el.style.setProperty('--dy', `${o[1]}px`);
+    el.style.setProperty('--rot', `${o[2]}deg`);
+    el.style.animationDelay = `${i * 45}ms`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 950 + i * 45);
+  });
+  back.classList.remove('shuffling'); void back.offsetWidth; back.classList.add('shuffling');
+  setTimeout(() => back.classList.remove('shuffling'), 800);
+  toast('🔀 Deck shuffled!');
 }
 
 // Display order for grouping the hand.

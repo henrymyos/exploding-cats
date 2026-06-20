@@ -182,6 +182,7 @@ Game.prototype.resolveAction = function resolveAction() {
     }
     case 'SHUFFLE':
       shuffle(this.deck);
+      this.shuffleSeq = (this.shuffleSeq || 0) + 1;
       this.logMsg('The draw pile was shuffled.');
       break;
     case 'FUTURE':
