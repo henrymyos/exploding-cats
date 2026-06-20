@@ -1022,9 +1022,12 @@ const CAT_PHOTOS = {
   genevieve: ['genevieve.png', 'genevieve2.png', 'genevieve3.png'],
 };
 
+// Every photo of every cat — action cards pull a random one from this pool.
+const ALL_PHOTOS = Object.values(CAT_PHOTOS).reduce((a, list) => a.concat(list), []);
+
 function photoFor(card) {
-  const catId = card.type === 'CAT' ? card.cat : (ACTION_ART[card.type] || 'max');
-  const list = CAT_PHOTOS[catId] || [`${catId}.png`];
+  // Cat cards: a random photo OF THAT cat. Action cards: a random cat photo of any cat.
+  const list = card.type === 'CAT' ? (CAT_PHOTOS[card.cat] || [`${card.cat}.png`]) : ALL_PHOTOS;
   // hash the card id so each physical card keeps a stable photo, but copies vary
   const s = (card && (card.id || card.type)) || 'x';
   let h = 0;
