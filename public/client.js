@@ -494,13 +494,23 @@ function giveCard(cardId) {
   });
 }
 
-// Tapping a stack cycles how many of that card are selected (0→1→…→max→0).
-// Selecting a new group clears any previous selection.
+// Tapping a stack cycles through the playable selection sizes for that card,
+// then back to none. Cats jump straight to 2 (a pair) since a single cat can't
+// be played: have 2 -> 2 -> 0; have 3+ -> 2 -> 3 -> 0. Others: 1 -> 0.
 function cycleGroup(grp, g, me) {
   if (!(g.turnPlayerId === PLAYER_ID) || g.pending) return;
   const k = grp.cards.filter((c) => selected.has(c.id)).length;
-  const maxSel = grp.isCat ? Math.min(grp.cards.length, 3) : 1;
-  const newK = k >= maxSel ? 0 : k + 1;
+  let steps;
+  if (grp.isCat) {
+    steps = [];
+    if (grp.cards.length >= 2) steps.push(2);
+    if (grp.cards.length >= 3) steps.push(3);
+    if (steps.length === 0) steps.push(1); // lone cat: select it to show "need a pair"
+    steps.push(0);
+  } else {
+    steps = [1, 0];
+  }
+  const newK = steps[(steps.indexOf(k) + 1) % steps.length];
   selected = new Set(grp.cards.slice(0, newK).map((c) => c.id));
   renderHand(g, me, g.turnPlayerId === PLAYER_ID);
 }
