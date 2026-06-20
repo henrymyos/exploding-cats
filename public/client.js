@@ -412,6 +412,10 @@ function renderHand(g, me, isMyTurn) {
   const held = new Set(me.hand.map((c) => c.id));
   selected = new Set([...selected].filter((id) => held.has(id)));
 
+  // "giving" mode: a Favor was played on me — highlight every card, tap to give.
+  const giving = !!(g.pending && g.pending.kind === 'favorPick' && g.pending.youMustGive);
+  hand.classList.toggle('giving', giving);
+
   for (const grp of groupHand(me.hand)) {
     const selCount = grp.cards.filter((c) => selected.has(c.id)).length;
     const stack = document.createElement('div');
@@ -438,10 +442,17 @@ function renderHand(g, me, isMyTurn) {
       pill.textContent = selCount + ' picked';
       stack.appendChild(pill);
     }
-    stack.onclick = () => cycleGroup(grp, g, me);
+    stack.onclick = giving ? () => giveCard(grp.cards[0].id) : () => cycleGroup(grp, g, me);
     hand.appendChild(stack);
   }
   renderHandActions(g, me, isMyTurn);
+}
+
+// Give a chosen card to the player who played a Favor.
+function giveCard(cardId) {
+  socket.emit('favorGive', { code: state.code, playerId: PLAYER_ID, cardId }, (res) => {
+    if (!res.ok) toast(res.error, true);
+  });
 }
 
 // Tapping a stack cycles how many of that card are selected (0→1→…→max→0).
@@ -605,9 +616,9 @@ function renderPending(g, me) {
     if (overlayMode === 'future') closeOverlay();
   }
 
-  // Favor: I must give a card
+  // Favor: I must give a card — prompt in place; the hand lights up to be tapped.
   if (p.kind === 'favorPick' && p.youMustGive) {
-    showFavorGive(me);
+    area.textContent = `🎁 Tap a card to give to ${escapeHtml(p.actorName || 'them')}`;
   }
 
   // Defuse: I must place the exploding cat back
