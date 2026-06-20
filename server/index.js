@@ -34,7 +34,10 @@ function broadcast(code) {
     code: room.code,
     hostId: room.hostId,
     started: !!room.game,
-    players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, isBot: !!p.isBot })),
+    players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, isBot: !!p.isBot, avatar: p.avatar || null })),
+    scores: manager.scoreboard(room),
+    streak: room.streak || null,
+    reaction: room.reaction || null,
   };
   for (const p of room.players) {
     const payload = { lobby };
@@ -62,23 +65,29 @@ function ackOk(cb, data = {}) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', ({ name, playerId }, cb) => {
+  socket.on('createRoom', ({ name, playerId, avatar }, cb) => {
     if (!name || !playerId) return ackErr(cb, 'Missing name.');
-    const room = manager.createRoom(name.trim().slice(0, 16), playerId);
+    const room = manager.createRoom(name.trim().slice(0, 16), playerId, avatar);
     socketIndex.set(socket.id, { code: room.code, playerId });
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
   });
 
-  socket.on('joinRoom', ({ code, name, playerId }, cb) => {
+  socket.on('joinRoom', ({ code, name, playerId, avatar }, cb) => {
     if (!name || !playerId || !code) return ackErr(cb, 'Missing details.');
-    const { room, error } = manager.joinRoom(code, name.trim().slice(0, 16), playerId);
+    const { room, error } = manager.joinRoom(code, name.trim().slice(0, 16), playerId, avatar);
     if (error) return ackErr(cb, error);
     socketIndex.set(socket.id, { code: room.code, playerId });
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
+  });
+
+  socket.on('react', ({ code, playerId, emoji }, cb) => {
+    manager.react(code, playerId, emoji);
+    ackOk(cb);
+    broadcast(code);
   });
 
   socket.on('addBot', ({ code, playerId }, cb) => {

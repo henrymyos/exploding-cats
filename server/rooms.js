@@ -2,6 +2,7 @@
 
 const { Game } = require('./game');
 const brain = require('./botBrain');
+const { catList } = require('./cards');
 require('./actions'); // augments Game.prototype
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
@@ -9,6 +10,13 @@ const MAX_PLAYERS = 5;
 const MIN_PLAYERS = 2;
 
 const BOT_NAMES = ['Whiskers Bot', 'Mittens Bot', 'Felix Bot', 'Smokey Bot', 'Tiger Bot'];
+const CAT_IDS = catList().map((c) => c.id);
+const REACTION_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];
+
+// Validate an avatar choice (must be one of our cats); returns null if invalid.
+function cleanAvatar(avatar) {
+  return CAT_IDS.includes(avatar) ? avatar : null;
+}
 
 function randomCode() {
   let s = '';
@@ -35,15 +43,19 @@ class RoomManager {
     this.broadcast = broadcast; // (code) => void  (server re-sends snapshots)
   }
 
-  createRoom(hostName, hostId) {
+  createRoom(hostName, hostId, avatar) {
     let code = randomCode();
     while (this.rooms.has(code)) code = randomCode();
     const room = {
       code,
       hostId,
-      players: [{ id: hostId, name: hostName, connected: true }],
+      players: [{ id: hostId, name: hostName, connected: true, avatar: cleanAvatar(avatar) }],
       game: null,
       timer: null,
+      scores: {},   // playerId -> { id, name, isBot, wins }
+      streak: null, // { id, name, count }
+      reaction: null,
+      reactionSeq: 0,
     };
     this.rooms.set(code, room);
     return room;
@@ -53,7 +65,7 @@ class RoomManager {
     return this.rooms.get((code || '').toUpperCase());
   }
 
-  joinRoom(code, name, playerId) {
+  joinRoom(code, name, playerId, avatar) {
     const room = this.getRoom(code);
     if (!room) return { error: 'No room with that code.' };
     // Rejoin if this player was already here — restore human control of their seat.
@@ -61,6 +73,7 @@ class RoomManager {
     if (existing) {
       existing.connected = true;
       existing.name = name || existing.name;
+      if (cleanAvatar(avatar)) existing.avatar = cleanAvatar(avatar);
       if (room.game) {
         const seat = room.game.playerById(playerId);
         if (seat && !seat.isBot) seat.botControlled = false;
@@ -69,7 +82,7 @@ class RoomManager {
     }
     if (room.game) return { error: 'That game has already started.' };
     if (room.players.length >= MAX_PLAYERS) return { error: 'Room is full (max 5).' };
-    room.players.push({ id: playerId, name, connected: true });
+    room.players.push({ id: playerId, name, connected: true, avatar: cleanAvatar(avatar) });
     return { room };
   }
 
@@ -151,7 +164,8 @@ class RoomManager {
     const used = new Set(room.players.map((p) => p.name));
     const name = BOT_NAMES.find((n) => !used.has(n)) || `Bot ${room.players.length}`;
     const id = `bot_${randomCode()}${room.players.length}`;
-    room.players.push({ id, name, connected: true, isBot: true });
+    const avatar = CAT_IDS[room.players.length % CAT_IDS.length];
+    room.players.push({ id, name, connected: true, isBot: true, avatar });
     return { room };
   }
 
@@ -212,6 +226,7 @@ class RoomManager {
     else if (kind === 'stealPick') game.stealAuto();
     // A resolution can open a NEW pending (e.g. action -> favorPick); chain it.
     this.scheduleResolve(room);
+    this.recordResultIfFinished(room);
     this.broadcast(room.code);
     this.scheduleBots(room);
   }
@@ -219,8 +234,44 @@ class RoomManager {
   // After any successful player action that changes pending state.
   afterMutation(room) {
     this.scheduleResolve(room);
+    this.recordResultIfFinished(room);
     this.broadcast(room.code);
     this.scheduleBots(room);
+  }
+
+  // ---- reactions + scoreboard ----
+
+  react(code, playerId, emoji) {
+    const room = this.getRoom(code);
+    if (!room) return;
+    if (!REACTION_EMOJIS.includes(emoji)) return;
+    if (!room.players.find((p) => p.id === playerId)) return; // must be in the room
+    room.reactionSeq = (room.reactionSeq || 0) + 1;
+    room.reaction = { seq: room.reactionSeq, playerId, emoji };
+  }
+
+  // When a game ends, tally the win + streak once.
+  recordResultIfFinished(room) {
+    const g = room.game;
+    if (!g || g.phase !== 'finished' || g._scored) return;
+    g._scored = true;
+    const winnerId = g.winnerId;
+    if (!winnerId) return;
+    const wp = g.playerById(winnerId);
+    const name = wp ? wp.name : 'Winner';
+    const isBot = !!(wp && wp.isBot);
+    if (!room.scores) room.scores = {};
+    const entry = room.scores[winnerId] || { id: winnerId, name, isBot, wins: 0 };
+    entry.name = name; entry.isBot = isBot; entry.wins += 1;
+    room.scores[winnerId] = entry;
+    if (room.streak && room.streak.id === winnerId) room.streak.count += 1;
+    else room.streak = { id: winnerId, name, count: 1 };
+  }
+
+  // Sorted scoreboard for display.
+  scoreboard(room) {
+    const list = Object.values(room.scores || {});
+    return list.sort((a, b) => b.wins - a.wins);
   }
 
   // ---- bot driving ----

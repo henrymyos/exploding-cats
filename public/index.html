@@ -22,6 +22,11 @@
           <input id="nameInput" type="text" maxlength="16" placeholder="e.g. Mom" autocomplete="off" />
         </label>
 
+        <div class="field">
+          <span>Pick your cat</span>
+          <div id="avatarPicker" class="avatar-picker"></div>
+        </div>
+
         <button id="createBtn" class="btn primary">Create a game</button>
 
         <div class="divider"><span>or join one</span></div>
@@ -48,6 +53,7 @@
         </div>
         <button id="startBtn" class="btn primary">Start game</button>
         <p id="lobbyHint" class="hint"></p>
+        <div id="lobbyScores" class="scoreboard"></div>
       </div>
     </section>
 
@@ -79,7 +85,11 @@
 
       <aside id="drawReveal" class="draw-reveal hidden"></aside>
 
+      <!-- quick reactions -->
+      <div id="reactBar" class="react-bar"></div>
+
       <button id="menuToggle" class="menu-toggle" title="Game menu">☰</button>
+      <button id="soundToggle" class="sound-toggle" title="Sound on/off">🔊</button>
       <button id="logToggle" class="log-toggle" title="Game log">📜</button>
       <aside id="logPanel" class="log-panel">
         <button id="logClose" class="log-close" aria-label="Close log">✕</button>

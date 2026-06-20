@@ -34,8 +34,91 @@ function toast(msg, isErr) {
   toast._t = setTimeout(() => t.classList.add('hidden'), 2600);
 }
 
+/* ---------------- sound (synthesized, no asset files) ---------------- */
+const Sound = (() => {
+  let ctx = null;
+  let muted = localStorage.getItem('ec_muted') === '1';
+  const ac = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; };
+  function beep(freq, dur, opt = {}) {
+    const c = ac();
+    const t = c.currentTime + (opt.delay || 0);
+    const o = c.createOscillator();
+    const g = c.createGain();
+    o.type = opt.type || 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if (opt.slideTo) o.frequency.exponentialRampToValueAtTime(opt.slideTo, t + dur);
+    g.gain.setValueAtTime(opt.gain || 0.16, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t); o.stop(t + dur + 0.02);
+  }
+  function noise(dur, opt = {}) {
+    const c = ac();
+    const t = c.currentTime + (opt.delay || 0);
+    const buf = c.createBuffer(1, Math.max(1, c.sampleRate * dur), c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const f = c.createBiquadFilter(); f.type = opt.hp ? 'highpass' : 'lowpass'; f.frequency.value = opt.freq || 1800;
+    const g = c.createGain();
+    g.gain.setValueAtTime(opt.gain || 0.18, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g); g.connect(c.destination);
+    src.start(t); src.stop(t + dur + 0.02);
+  }
+  const sounds = {
+    draw() { beep(320, 0.16, { slideTo: 620, type: 'sine', gain: 0.12 }); noise(0.12, { gain: 0.05, freq: 2600 }); },
+    play() { beep(540, 0.1, { type: 'triangle', gain: 0.12 }); },
+    discard() { noise(0.1, { gain: 0.12, freq: 3000, hp: true }); },
+    shuffle() { for (let i = 0; i < 6; i += 1) noise(0.05, { gain: 0.1, freq: 4000, hp: true, delay: i * 0.06 }); },
+    explode() { noise(0.5, { gain: 0.3, freq: 700 }); beep(140, 0.5, { slideTo: 40, type: 'sawtooth', gain: 0.22 }); },
+    nope() { beep(420, 0.14, { slideTo: 210, type: 'square', gain: 0.13 }); beep(300, 0.16, { slideTo: 150, type: 'square', gain: 0.12, delay: 0.14 }); },
+    react() { beep(720, 0.08, { type: 'sine', gain: 0.1 }); },
+    turn() { beep(660, 0.1, { gain: 0.09 }); beep(880, 0.1, { gain: 0.09, delay: 0.1 }); },
+    victory() { [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.22, { gain: 0.14, type: 'triangle', delay: i * 0.13 })); },
+  };
+  return {
+    isMuted: () => muted,
+    toggle() { muted = !muted; localStorage.setItem('ec_muted', muted ? '1' : '0'); if (!muted) { try { ac().resume(); } catch (e) {} } return muted; },
+    resume() { try { ac().resume(); } catch (e) {} },
+    play(name) { if (muted) return; try { ac().resume(); sounds[name] && sounds[name](); } catch (e) {} },
+  };
+})();
+// browsers need a gesture before audio; warm it up on first interaction
+document.addEventListener('pointerdown', () => Sound.resume(), { once: true });
+
+/* ---------------- avatar (which cat represents you) ---------------- */
+const AVATAR_CATS = ['max', 'pepper', 'gambit', 'loki', 'genevieve'];
+let myAvatar = localStorage.getItem('ec_avatar') || AVATAR_CATS[Math.floor(Math.random() * AVATAR_CATS.length)];
+
+function renderAvatarPicker() {
+  const box = $('avatarPicker');
+  if (!box) return;
+  box.innerHTML = AVATAR_CATS.map((c) =>
+    `<button class="avatar-opt${c === myAvatar ? ' on' : ''}" data-cat="${c}" style="background-image:url('/assets/cats/${c}.png')" title="${c}"></button>`
+  ).join('');
+  box.querySelectorAll('.avatar-opt').forEach((b) => {
+    b.onclick = () => { myAvatar = b.dataset.cat; localStorage.setItem('ec_avatar', myAvatar); renderAvatarPicker(); Sound.resume(); };
+  });
+}
+
 /* ---------------- bootstrap ---------------- */
 fetch('/api/cats').then((r) => r.json()).then((c) => { CATS = c; }).catch(() => {});
+renderAvatarPicker();
+
+$('soundToggle').onclick = () => { const m = Sound.toggle(); $('soundToggle').textContent = m ? '🔇' : '🔊'; if (!m) Sound.play('react'); };
+if (Sound.isMuted()) $('soundToggle').textContent = '🔇';
+
+/* ---------------- quick reactions ---------------- */
+const REACT_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];
+(function buildReactBar() {
+  const bar = $('reactBar');
+  if (!bar) return;
+  bar.innerHTML = REACT_EMOJIS.map((e) => `<button class="react-btn">${e}</button>`).join('');
+  bar.querySelectorAll('.react-btn').forEach((b) => {
+    b.onclick = () => socket.emit('react', { code: state.code, playerId: PLAYER_ID, emoji: b.textContent }, () => {});
+  });
+}());
 
 if (localStorage.getItem('ec_name')) $('nameInput').value = localStorage.getItem('ec_name');
 
@@ -49,7 +132,7 @@ function currentName() {
 $('createBtn').onclick = () => {
   const name = currentName();
   if (!name) return ($('homeError').textContent = 'Enter your name first.');
-  socket.emit('createRoom', { name, playerId: PLAYER_ID }, (res) => {
+  socket.emit('createRoom', { name, playerId: PLAYER_ID, avatar: myAvatar }, (res) => {
     if (!res.ok) return ($('homeError').textContent = res.error);
     state.code = res.code;
   });
@@ -60,7 +143,7 @@ $('joinBtn').onclick = () => {
   const code = $('codeInput').value.trim().toUpperCase();
   if (!name) return ($('homeError').textContent = 'Enter your name first.');
   if (code.length !== 4) return ($('homeError').textContent = 'Enter the 4-letter room code.');
-  socket.emit('joinRoom', { code, name, playerId: PLAYER_ID }, (res) => {
+  socket.emit('joinRoom', { code, name, playerId: PLAYER_ID, avatar: myAvatar }, (res) => {
     if (!res.ok) return ($('homeError').textContent = res.error);
     state.code = res.code;
   });
@@ -77,7 +160,7 @@ const savedCode = localStorage.getItem('ec_code');
 socket.on('connect', () => {
   if (savedCode && state.code == null) {
     const name = $('nameInput').value.trim() || 'Player';
-    socket.emit('joinRoom', { code: savedCode, name, playerId: PLAYER_ID }, (res) => {
+    socket.emit('joinRoom', { code: savedCode, name, playerId: PLAYER_ID, avatar: myAvatar }, (res) => {
       if (res.ok) state.code = res.code;
     });
   }
@@ -97,9 +180,38 @@ socket.on('state', (payload) => {
 function render() {
   const { lobby, game } = state;
   if (!lobby) return showScreen('home');
-  if (!game) { renderLobby(lobby); return showScreen('lobby'); }
-  renderGame(game, lobby);
-  showScreen('game');
+  if (game) { renderGame(game, lobby); showScreen('game'); }
+  else { renderLobby(lobby); showScreen('lobby'); }
+  handleReaction(lobby);
+}
+
+/* ---------------- reaction display ---------------- */
+let reactionStarted = false;
+let lastReactionSeq = 0;
+function handleReaction(lobby) {
+  const r = lobby && lobby.reaction;
+  if (!r) return;
+  if (!reactionStarted) { reactionStarted = true; lastReactionSeq = r.seq; return; }
+  if (r.seq !== lastReactionSeq) { lastReactionSeq = r.seq; popReaction(r); Sound.play('react'); }
+}
+
+function popReaction(r) {
+  let anchor = null;
+  if (state.game) {
+    anchor = r.playerId === PLAYER_ID ? $('hand') : document.querySelector(`.opp[data-id="${cssId(r.playerId)}"]`);
+  } else {
+    anchor = document.querySelector(`#lobbyPlayers li[data-id="${cssId(r.playerId)}"]`);
+  }
+  if (!anchor) return;
+  const rect = anchor.getBoundingClientRect();
+  if (!rect.width) return;
+  const el = document.createElement('div');
+  el.className = 'reaction-pop';
+  el.textContent = r.emoji;
+  el.style.left = `${rect.left + rect.width / 2}px`;
+  el.style.top = `${rect.top + 6}px`;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
 }
 
 /* ---------------- lobby render ---------------- */
@@ -109,12 +221,14 @@ function renderLobby(lobby) {
   list.innerHTML = '';
   for (const p of lobby.players) {
     const li = document.createElement('li');
-    const icon = p.isBot ? '🤖' : `<span class="dot ${p.connected ? '' : 'off'}"></span>`;
+    const av = avatarHtml(p);
     const tag = p.id === lobby.hostId ? '<span class="host-tag">HOST</span>'
       : (p.isBot ? '<span class="bot-tag">BOT</span>' : '');
-    li.innerHTML = `${icon}${escapeHtml(p.name)}${tag}`;
+    const dot = p.isBot ? '' : `<span class="dot ${p.connected ? '' : 'off'}"></span>`;
+    li.innerHTML = `${av}${dot}${escapeHtml(p.name)}${tag}`;
     list.appendChild(li);
   }
+  renderScoreboard($('lobbyScores'), lobby);
   const isHost = lobby.hostId === PLAYER_ID;
   const enough = lobby.players.length >= 2;
   const full = lobby.players.length >= 5;
@@ -128,6 +242,27 @@ function renderLobby(lobby) {
   $('lobbyHint').textContent = isHost
     ? (enough ? 'Everyone in? Add bots to fill seats, then hit start!' : 'Add a bot or wait for another player (need at least 2)...')
     : 'Waiting for the host to start the game...';
+}
+
+// A player's avatar: their chosen cat photo, or an emoji fallback.
+function avatarHtml(p) {
+  if (p && p.avatar) return `<span class="avatar" style="background-image:url('/assets/cats/${p.avatar}.png')"></span>`;
+  return `<span class="avatar emoji">${p && p.isBot ? '🤖' : '😺'}</span>`;
+}
+
+function renderScoreboard(el, lobby) {
+  if (!el) return;
+  const scores = (lobby && lobby.scores) || [];
+  if (!scores.length) { el.innerHTML = ''; return; }
+  const streak = lobby && lobby.streak;
+  let html = '<h3 class="sb-title">🏆 Wins this room</h3><ul class="sb-list">';
+  for (const s of scores) {
+    const onStreak = streak && streak.id === s.id && streak.count >= 2;
+    html += `<li><span class="sb-name">${escapeHtml(s.name)}${s.isBot ? ' 🤖' : ''}</span>` +
+      `<span class="sb-wins">${s.wins}${onStreak ? ` <span class="sb-streak">🔥${streak.count}</span>` : ''}</span></li>`;
+  }
+  html += '</ul>';
+  el.innerHTML = html;
 }
 
 $('addBotBtn').onclick = () => {
@@ -148,6 +283,9 @@ function renderGame(g, lobby) {
   // come separately as g.hand. Attach them so the hand helpers can use me.hand.
   if (me) me.hand = g.hand || [];
   const isMyTurn = g.turnPlayerId === PLAYER_ID;
+  // avatar lookup (avatars live on the lobby payload, not the game snapshot)
+  const avById = {};
+  (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; });
 
   // opponents (everyone but me) — show a fan of card backs for their hand
   const opp = $('opponents');
@@ -160,9 +298,11 @@ function renderGame(g, lobby) {
     const fanCount = Math.min(p.handCount, 8);
     let fan = '';
     for (let i = 0; i < fanCount; i += 1) fan += '<span class="mini-back"></span>';
+    const avEl = avById[p.id]
+      ? `<span class="opp-avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>`
+      : `<span class="opp-avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
     div.innerHTML =
-      `<div class="opp-head"><span class="opp-avatar">${p.isBot ? '🤖' : '😺'}</span>` +
-      `<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
+      `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
       `<div class="opp-fan">${fan}</div>` +
       `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
     opp.appendChild(div);
@@ -205,8 +345,17 @@ function renderGame(g, lobby) {
   handleExplodeShake(g);
   handleTransfer(g);
   handleShuffle(g);
+  handleTurnChime(g);
   if (g.phase === 'finished') showVictory(g, lobby);
   else hideVictory();
+}
+
+// A soft chime when your turn begins (and no blocking pending).
+let prevWasMyTurn = false;
+function handleTurnChime(g) {
+  const myTurnNow = g.phase === 'playing' && g.turnPlayerId === PLAYER_ID && !g.pending;
+  if (myTurnNow && !prevWasMyTurn) Sound.play('turn');
+  prevWasMyTurn = myTurnNow;
 }
 
 /* ---------------- card-taken popup (taker + loser) ---------------- */
@@ -267,14 +416,27 @@ function showVictory(g, lobby) {
     : `<p class="hint">Waiting for ${escapeHtml(hostName || 'the host')} to start a new game…</p>` +
       `<button class="btn" id="vicHomeBtn">🏠 Leave</button>`;
 
+  const winnerAvatar = lobby && lobby.players ? (lobby.players.find((p) => p.id === g.winnerId) || {}).avatar : null;
+  const crown = winnerAvatar
+    ? `<div class="victory-avatar" style="background-image:url('/assets/cats/${winnerAvatar}.png')"></div>`
+    : `<div class="trophy">🏆</div>`;
+  const streak = lobby && lobby.streak;
+  const streakLine = streak && streak.id === g.winnerId && streak.count >= 2
+    ? `<div class="victory-streak">🔥 ${streak.count} wins in a row!</div>` : '';
+
   v.innerHTML =
     `<div class="confetti-layer">${confetti}</div>` +
     `<div class="victory-box">` +
-      `<div class="trophy">🏆</div>` +
+      `<div class="victory-crown">🏆</div>` +
+      crown +
       `<h1>${youWon ? 'You win!' : escapeHtml((winner && winner.name) || 'Game over')}${youWon || !winner ? '' : ' wins!'}</h1>` +
       `<div class="victory-sub">last cat standing</div>` +
+      streakLine +
+      `<div id="victoryScores" class="scoreboard"></div>` +
       buttons +
     `</div>`;
+  renderScoreboard($('victoryScores'), lobby);
+  Sound.play('victory');
   v.classList.remove('hidden');
 
   const pa = $('playAgainBtn');
@@ -314,6 +476,7 @@ function screenShake() {
   setTimeout(() => app.classList.remove('shake'), 650);
   const boom = $('boom');
   if (boom) { boom.classList.remove('on'); void boom.offsetWidth; boom.classList.add('on'); setTimeout(() => boom.classList.remove('on'), 650); }
+  Sound.play('explode');
 }
 
 /* ---------------- table animations ---------------- */
@@ -327,6 +490,7 @@ function handleDrawAnimation(g) {
     // opponents' draws fly from the deck to their seat.
     const target = key === PLAYER_ID ? $('drawReveal') : document.querySelector(`.opp[data-id="${cssId(key)}"]`);
     flyCard($('drawPile'), target); // face-down from the deck
+    if (key === PLAYER_ID) Sound.play('draw');
   }
   prevDrawnKey = key;
 }
@@ -337,6 +501,7 @@ function handleDiscardAnimation(g) {
   const dc = g.discardCount || 0;
   if (prevDiscardCount !== null && dc > prevDiscardCount && g.discardTop) {
     flyCard(discardSourceEl(g), $('discardTop'), g.discardTop);
+    Sound.play(g.discardTop.type === 'NOPE' ? 'nope' : 'play');
   }
   prevDiscardCount = dc;
 }
@@ -420,6 +585,7 @@ function shuffleAnimation() {
   });
   back.classList.remove('shuffling'); void back.offsetWidth; back.classList.add('shuffling');
   setTimeout(() => back.classList.remove('shuffling'), 800);
+  Sound.play('shuffle');
   toast('🔀 Deck shuffled!');
 }
 
@@ -908,7 +1074,7 @@ $('logClose').onclick = () => $('logPanel').classList.remove('open');
 function renderLog(log) {
   const ul = $('logList');
   ul.innerHTML = '';
-  for (const entry of [...log].reverse()) {
+  for (const entry of [...(log || [])].reverse()) {
     const li = document.createElement('li');
     li.textContent = entry.text;
     ul.appendChild(li);
