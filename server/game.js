@@ -44,6 +44,7 @@ class Game {
     this.pending = null;
     this.transferSeq = 0;     // increments on each card stolen/given
     this.lastTransfer = null; // { seq, card, fromId, toId, fromName, toName }
+    this.lastDiscardBy = null; // id of whoever most recently sent a card to the discard
     this.deal();
   }
 
@@ -191,6 +192,7 @@ class Game {
       hand: me ? me.hand : [],
       pending: this.publicPending(playerId),
       transfer: this.transferFor(playerId),
+      lastDiscardBy: this.lastDiscardBy,
       log: this.log.slice(-30),
     };
   }

@@ -64,9 +64,10 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
     if (target.hand.length === 0) return err('That player has no cards to give.');
   }
 
-  // Move card to discard and open the Hiss window.
+  // Move card to discard and open the Nope window.
   this.removeCardFromHand(player, card.id);
   this.discard.push(card);
+  this.lastDiscardBy = player.id;
   this.logMsg(`${player.name} played ${card.name}.`);
 
   this.pending = {
@@ -102,6 +103,7 @@ Game.prototype.playCatCombo = function playCatCombo(player, cards, opts) {
     this.removeCardFromHand(player, c.id);
     this.discard.push(c);
   }
+  this.lastDiscardBy = player.id;
   const mode = cards.length === 2 ? 'random' : 'named';
   this.logMsg(
     `${player.name} played ${cards.length} ${cards[0].name} cards on ${target.name}.`
@@ -135,6 +137,7 @@ Game.prototype.playNope = function playNope(playerId) {
 
   this.removeCardFromHand(player, card.id);
   this.discard.push(card);
+  this.lastDiscardBy = playerId; // the Nope flies from whoever played it
   this.pending.nopes.push(playerId);
   this.pending.endsAt = Date.now() + NOPE_WINDOW_MS; // reopen the window for a counter-Nope
   const state = this.pending.nopes.length % 2 === 1 ? 'cancelled' : 'back on';
@@ -371,6 +374,7 @@ Game.prototype.applyExplode = function applyExplode() {
   const player = this.playerById(this.pending.actorId);
   const card = this.pending.explodeCard;
   const defuse = player.hand.find((c) => c.type === 'DEFUSE');
+  this.lastDiscardBy = player.id;
   if (defuse) {
     this.removeCardFromHand(player, defuse.id);
     this.discard.push(defuse);

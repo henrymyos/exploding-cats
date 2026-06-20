@@ -340,10 +340,10 @@ function handleDiscardAnimation(g) {
   prevDiscardCount = dc;
 }
 
-// Best guess at who just discarded a card, so it flies from their position.
+// Who actually sent the card to the discard (e.g. a Nope flies from the noper,
+// not the player whose action it interrupted). Falls back to the turn player.
 function discardSourceEl(g) {
-  const p = g.pending;
-  const id = p && (p.kind === 'action' || p.kind === 'defuse') ? p.actorId : g.turnPlayerId;
+  const id = g.lastDiscardBy || g.turnPlayerId;
   if (id === PLAYER_ID) return $('hand');
   return document.querySelector(`.opp[data-id="${cssId(id)}"]`) || $('hand');
 }
