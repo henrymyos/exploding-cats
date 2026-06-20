@@ -1041,6 +1041,8 @@ function goHome() {
   state.game = null;
   localStorage.removeItem('ec_code');
   closeOverlay();
+  hideVictory();      // the celebration is a separate fixed layer — hide it too
+  hideDrawReveal();
   $('logPanel').classList.remove('open');
   showScreen('home');
 }
