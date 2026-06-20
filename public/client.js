@@ -577,6 +577,8 @@ function aliveOpponents(g) {
 function promptTarget(me, g, sel, mode) {
   const opps = aliveOpponents(g);
   if (opps.length === 0) return toast('No one to target.', true);
+  // only one other player — no need to ask, just take from them
+  if (opps.length === 1) { doPlay(sel.map((c) => c.id), { targetId: opps[0].id }); return; }
   openOverlay(`
     <h2>${mode === 'favor' ? 'Ask a favor from whom?' : 'Steal from whom?'}</h2>
     <div class="choice-grid">
@@ -593,6 +595,8 @@ function promptTarget(me, g, sel, mode) {
 function promptNamed(me, g, sel) {
   const opps = aliveOpponents(g);
   if (opps.length === 0) return toast('No one to target.', true);
+  // only one other player — skip "who" and go straight to picking a card type
+  if (opps.length === 1) { promptNamedType(opps[0].id, sel); return; }
   // step 1: who
   openOverlay(`
     <h2>Demand from whom?</h2>
@@ -603,28 +607,29 @@ function promptNamed(me, g, sel) {
   `);
   $('cancelOverlay').onclick = closeOverlay;
   $('overlayBox').querySelectorAll('.choice').forEach((btn) => {
-    btn.onclick = () => {
-      const targetId = btn.dataset.id;
-      // step 2: which card type
-      const types = [
-        { v: 'DEFUSE', n: 'Defuse' }, { v: 'NOPE', n: 'Nope' }, { v: 'ATTACK', n: 'Attack' },
-        { v: 'SKIP', n: 'Skip' }, { v: 'FAVOR', n: 'Favor' }, { v: 'SHUFFLE', n: 'Shuffle' },
-        { v: 'FUTURE', n: 'See the Future' },
-        ...CATS.map((c) => ({ v: c.id, n: c.name })),
-      ];
-      openOverlay(`
-        <h2>Demand which card?</h2>
-        <p class="hint">If they don't have it, you get nothing.</p>
-        <div class="choice-grid">
-          ${types.map((t) => `<button class="choice" data-v="${t.v}">${escapeHtml(t.n)}</button>`).join('')}
-        </div>
-        <button class="btn" id="cancelOverlay">Cancel</button>
-      `);
-      $('cancelOverlay').onclick = closeOverlay;
-      $('overlayBox').querySelectorAll('.choice').forEach((b2) => {
-        b2.onclick = () => doPlay(sel.map((c) => c.id), { targetId, namedType: b2.dataset.v });
-      });
-    };
+    btn.onclick = () => promptNamedType(btn.dataset.id, sel);
+  });
+}
+
+// step 2: which card type to demand
+function promptNamedType(targetId, sel) {
+  const types = [
+    { v: 'DEFUSE', n: 'Defuse' }, { v: 'NOPE', n: 'Nope' }, { v: 'ATTACK', n: 'Attack' },
+    { v: 'SKIP', n: 'Skip' }, { v: 'FAVOR', n: 'Favor' }, { v: 'SHUFFLE', n: 'Shuffle' },
+    { v: 'FUTURE', n: 'See the Future' },
+    ...CATS.map((c) => ({ v: c.id, n: c.name })),
+  ];
+  openOverlay(`
+    <h2>Demand which card?</h2>
+    <p class="hint">If they don't have it, you get nothing.</p>
+    <div class="choice-grid">
+      ${types.map((t) => `<button class="choice" data-v="${t.v}">${escapeHtml(t.n)}</button>`).join('')}
+    </div>
+    <button class="btn" id="cancelOverlay">Cancel</button>
+  `);
+  $('cancelOverlay').onclick = closeOverlay;
+  $('overlayBox').querySelectorAll('.choice').forEach((b2) => {
+    b2.onclick = () => doPlay(sel.map((c) => c.id), { targetId, namedType: b2.dataset.v });
   });
 }
 
