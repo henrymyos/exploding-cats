@@ -220,6 +220,18 @@ h1 { font-size: 2.2rem; margin: 0; }
 .card[data-type="FUTURE"] { background: linear-gradient(160deg, #5ee0e0, #2a9da8); }
 .card[data-type="CAT"] { background: linear-gradient(160deg, var(--panel-light), #2a2150); }
 
+/* the discard pile shows the played card's type color as a border + banner */
+.card-mini[data-type] { border: 3px solid var(--panel-light); }
+.card-mini[data-type="EXPLODE"] { border-color: #ff5a5a; background: linear-gradient(160deg, #ff5a5a, #b21f1f); }
+.card-mini[data-type="DEFUSE"]  { border-color: #5ee0a8; background: linear-gradient(160deg, #5ee0a8, #2a9d6f); }
+.card-mini[data-type="NOPE"]    { border-color: #ff8f6b; background: linear-gradient(160deg, #ff8f6b, #d4452a); }
+.card-mini[data-type="ATTACK"]  { border-color: #ff5e8a; background: linear-gradient(160deg, #ff5e8a, #a8225a); }
+.card-mini[data-type="SKIP"]    { border-color: #7aa8ff; background: linear-gradient(160deg, #7aa8ff, #3a5fd4); }
+.card-mini[data-type="FAVOR"]   { border-color: #d99bff; background: linear-gradient(160deg, #d99bff, #8a3ad4); }
+.card-mini[data-type="SHUFFLE"] { border-color: #ffcf5e; background: linear-gradient(160deg, #ffcf5e, #d49a2a); }
+.card-mini[data-type="FUTURE"]  { border-color: #5ee0e0; background: linear-gradient(160deg, #5ee0e0, #2a9da8); }
+.card-mini[data-type="CAT"]     { border-color: var(--accent2); background: linear-gradient(160deg, var(--panel-light), #2a2150); }
+
 /* stacked / fanned hand: identical cards grouped into one tappable pile */
 .stack { position: relative; display: flex; align-items: flex-start; cursor: pointer; transition: transform .12s; flex-shrink: 0; }
 .stack:hover { transform: translateY(-8px); }
