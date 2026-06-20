@@ -219,6 +219,8 @@ class Game {
       actorName: this.playerById(p.actorId) ? this.playerById(p.actorId).name : '',
       nopeCount: p.nopes ? p.nopes.length : 0,
       noped: p.nopes ? p.nopes.length % 2 === 1 : false,
+      // whoever made the most recent play in this chain — they can't Nope it
+      lastActorId: p.nopes && p.nopes.length ? p.nopes[p.nopes.length - 1] : p.actorId,
       endsAt: p.endsAt || null,
       description: p.description || '',
     };

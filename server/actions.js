@@ -132,6 +132,11 @@ Game.prototype.playNope = function playNope(playerId) {
   const player = this.playerById(playerId);
   if (!player || !player.alive) return err('You are out of the game.');
 
+  // You can't Nope your own most recent play (your own action, or your own Nope).
+  const nopes = this.pending.nopes;
+  const lastActor = nopes.length ? nopes[nopes.length - 1] : this.pending.actorId;
+  if (lastActor === playerId) return err('You cannot Nope your own action.');
+
   const card = player.hand.find((c) => c.type === 'NOPE');
   if (!card) return err('You have no Nope card.');
 

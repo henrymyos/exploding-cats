@@ -600,10 +600,11 @@ function renderPending(g, me) {
   if (!p) { area.textContent = ''; return; }
   area.textContent = p.description || '';
 
-  // Hiss window: anyone (alive) with a Hiss can interrupt.
-  if (p.kind === 'action' && me && me.alive) {
-    const hasHiss = me.hand.some((c) => c.type === 'NOPE');
-    if (hasHiss) {
+  // Nope window: any alive player with a Nope can interrupt — except whoever
+  // made the most recent play (you can't Nope your own action or your own Nope).
+  if (p.kind === 'action' && me && me.alive && p.lastActorId !== PLAYER_ID) {
+    const hasNope = me.hand.some((c) => c.type === 'NOPE');
+    if (hasNope) {
       $('hissText').textContent = p.noped ? 'Action NOPED — counter it?' : (p.description || 'An action is happening!');
       $('hissBar').classList.remove('hidden');
     }
