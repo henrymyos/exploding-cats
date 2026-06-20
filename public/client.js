@@ -962,9 +962,9 @@ function poseFor(card) {
 const CAT_PHOTOS = {
   max: ['max.png'],
   pepper: ['pepper.png'],
-  gambit: ['gambit.png', 'gambit2.png'],
-  loki: ['loki.png', 'loki2.png'],
-  genevieve: ['genevieve.png'],
+  gambit: ['gambit.png', 'gambit2.png', 'gambit3.png'],
+  loki: ['loki.png', 'loki2.png', 'loki3.png'],
+  genevieve: ['genevieve.png', 'genevieve2.png', 'genevieve3.png'],
 };
 
 function photoFor(card) {
