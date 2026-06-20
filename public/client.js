@@ -541,7 +541,7 @@ function promptTarget(me, g, sel, mode) {
   openOverlay(`
     <h2>${mode === 'favor' ? 'Ask a favor from whom?' : 'Steal from whom?'}</h2>
     <div class="choice-grid">
-      ${opps.map((p) => `<button class="choice" data-id="${p.id}">😺<br>${escapeHtml(p.name)}<br><span class="hint">${p.handCount} cards</span></button>`).join('')}
+      ${opps.map((p) => `<button class="choice" data-id="${p.id}"><span class="choice-avatar">😺</span><span class="choice-name">${escapeHtml(p.name)}</span><span class="choice-sub">${p.handCount} cards</span></button>`).join('')}
     </div>
     <button class="btn" id="cancelOverlay">Cancel</button>
   `);
@@ -558,7 +558,7 @@ function promptNamed(me, g, sel) {
   openOverlay(`
     <h2>Demand from whom?</h2>
     <div class="choice-grid">
-      ${opps.map((p) => `<button class="choice" data-id="${p.id}">😺<br>${escapeHtml(p.name)}</button>`).join('')}
+      ${opps.map((p) => `<button class="choice" data-id="${p.id}"><span class="choice-avatar">😺</span><span class="choice-name">${escapeHtml(p.name)}</span><span class="choice-sub">${p.handCount} cards</span></button>`).join('')}
     </div>
     <button class="btn" id="cancelOverlay">Cancel</button>
   `);
