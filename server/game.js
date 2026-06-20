@@ -40,8 +40,10 @@ class Game {
     this.phase = 'playing'; // 'playing' | 'finished'
     this.winnerId = null;
     this.log = [];
-    // pending action awaiting a Hiss (Nope) window, or a sub-decision (favor/defuse/future)
+    // pending action awaiting a Nope window, or a sub-decision (favor/defuse/future)
     this.pending = null;
+    this.transferSeq = 0;     // increments on each card stolen/given
+    this.lastTransfer = null; // { seq, card, fromId, toId, fromName, toName }
     this.deal();
   }
 
@@ -188,7 +190,21 @@ class Game {
       })),
       hand: me ? me.hand : [],
       pending: this.publicPending(playerId),
+      transfer: this.transferFor(playerId),
       log: this.log.slice(-30),
+    };
+  }
+
+  // The most recent card-take, shown only to the two players involved.
+  transferFor(playerId) {
+    const t = this.lastTransfer;
+    if (!t || (t.fromId !== playerId && t.toId !== playerId)) return null;
+    return {
+      seq: t.seq,
+      card: t.card,
+      fromName: t.fromName,
+      toName: t.toName,
+      youGained: t.toId === playerId,
     };
   }
 

@@ -228,9 +228,23 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
     } else {
       const [stolen] = target.hand.splice(idx, 1);
       actor.hand.push(stolen);
+      this.recordTransfer(stolen, target, actor);
       this.logMsg(`${actor.name} demanded and took a ${stolen.name} from ${target.name}.`);
     }
   }
+};
+
+// Note the most recent card-take so both players can be shown which card moved.
+Game.prototype.recordTransfer = function recordTransfer(card, fromP, toP) {
+  this.transferSeq = (this.transferSeq || 0) + 1;
+  this.lastTransfer = {
+    seq: this.transferSeq,
+    card: { type: card.type, cat: card.cat, name: card.name },
+    fromId: fromP.id,
+    toId: toP.id,
+    fromName: fromP.name,
+    toName: toP.name,
+  };
 };
 
 // The actor takes a chosen face-down card from the target's hand.
@@ -244,6 +258,7 @@ Game.prototype.stealTake = function stealTake(playerId, index) {
   i = Math.max(0, Math.min(i, target.hand.length - 1));
   const [stolen] = target.hand.splice(i, 1);
   actor.hand.push(stolen);
+  this.recordTransfer(stolen, target, actor);
   this.logMsg(`${actor.name} swiped a card from ${target.name}.`);
   this.pending = null;
   this.checkWin();
@@ -270,6 +285,7 @@ Game.prototype.favorGive = function favorGive(playerId, cardId) {
   const card = this.removeCardFromHand(target, cardId);
   if (!card) return err('You do not hold that card.');
   actor.hand.push(card);
+  this.recordTransfer(card, target, actor);
   this.logMsg(`${target.name} gave a card to ${actor.name}.`);
   this.pending = null;
   this.checkWin();

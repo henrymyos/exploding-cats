@@ -317,6 +317,8 @@ h1 { font-size: 2.2rem; margin: 0; }
   z-index: 35; padding: 16px; box-shadow: var(--shadow); transition: right .2s; overflow-y: auto;
 }
 .log-panel.open { right: 0; }
+.log-close { position: absolute; top: 12px; right: 12px; z-index: 2; background: var(--panel-light); border: none; color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow); }
+.log-close:hover { filter: brightness(1.15); }
 .log-panel h3 { margin-top: 40px; }
 .log-panel ul { list-style: none; padding: 0; margin: 0; }
 .log-panel li { font-size: .82rem; color: var(--muted); padding: 6px 0; border-bottom: 1px solid var(--bg2); }
@@ -329,6 +331,21 @@ h1 { font-size: 2.2rem; margin: 0; }
 }
 .toast.hidden { display: none; }
 .toast.err { background: var(--danger); }
+
+/* card-taken popup — shown to both the taker and the loser */
+.transfer-pop {
+  position: fixed; top: 14%; left: 50%; transform: translateX(-50%); z-index: 55;
+  background: var(--panel); border-radius: 16px; padding: 14px 18px; box-shadow: var(--shadow);
+  text-align: center; pointer-events: none;
+}
+.transfer-pop.hidden { display: none; }
+.transfer-pop .card { width: 122px; height: 172px; margin: 0 auto 10px; cursor: default; }
+.transfer-pop .t-label { font-weight: 700; color: var(--accent2); max-width: 200px; }
+.transfer-pop.show { animation: transferPop .32s cubic-bezier(.2,1.2,.4,1); }
+@keyframes transferPop {
+  from { transform: translateX(-50%) translateY(-12px) scale(.85); opacity: 0; }
+  to { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
 
 @media (max-width: 480px) {
   .card { width: 98px; height: 138px; }

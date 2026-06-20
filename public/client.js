@@ -203,8 +203,40 @@ function renderGame(g, lobby) {
   handleDrawAnimation(g);
   handleDiscardAnimation(g);
   handleExplodeShake(g);
+  handleTransfer(g);
   if (g.phase === 'finished') showVictory(g, lobby);
   else hideVictory();
+}
+
+/* ---------------- card-taken popup (taker + loser) ---------------- */
+let transferStarted = false;
+let lastTransferSeq = null;
+function handleTransfer(g) {
+  const t = g.transfer;
+  if (!transferStarted) {
+    // baseline on the first render this session — don't pop a pre-existing take
+    transferStarted = true;
+    lastTransferSeq = t ? t.seq : null;
+    return;
+  }
+  if (t && t.seq !== lastTransferSeq) {
+    showTransfer(t);
+    lastTransferSeq = t.seq;
+  }
+}
+
+function showTransfer(t) {
+  const el = $('transfer');
+  const label = t.youGained
+    ? `You took this from ${escapeHtml(t.fromName)}`
+    : `${escapeHtml(t.toName)} took this from you`;
+  el.innerHTML =
+    `<div class="card" data-type="${t.card.type}">${cardFace(t.card)}</div>` +
+    `<div class="t-label">${label}</div>`;
+  el.classList.remove('hidden');
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  clearTimeout(showTransfer._t);
+  showTransfer._t = setTimeout(() => el.classList.add('hidden'), 3400);
 }
 
 /* ---------------- victory celebration + game-over menu ---------------- */
@@ -806,6 +838,7 @@ $('menuToggle').onclick = () => {
 
 /* ---------------- log ---------------- */
 $('logToggle').onclick = () => $('logPanel').classList.toggle('open');
+$('logClose').onclick = () => $('logPanel').classList.remove('open');
 function renderLog(log) {
   const ul = $('logList');
   ul.innerHTML = '';

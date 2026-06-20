@@ -82,6 +82,7 @@
       <button id="menuToggle" class="menu-toggle" title="Game menu">☰</button>
       <button id="logToggle" class="log-toggle" title="Game log">📜</button>
       <aside id="logPanel" class="log-panel">
+        <button id="logClose" class="log-close" aria-label="Close log">✕</button>
         <h3>Game log</h3>
         <ul id="logList"></ul>
       </aside>
@@ -103,6 +104,9 @@
 
     <!-- victory celebration -->
     <div id="victory" class="victory hidden"></div>
+
+    <!-- card-taken popup (shown to the taker and the loser) -->
+    <div id="transfer" class="transfer-pop hidden"></div>
   </div>
 
   <!-- explosion flash (outside #app so it doesn't shake) -->
