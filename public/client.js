@@ -1183,8 +1183,8 @@ function poseFor(card) {
 
 // Real photos per cat. Cats with several shots rotate poses across card copies.
 const CAT_PHOTOS = {
-  max: ['max.png'],
-  pepper: ['pepper.png'],
+  max: ['max.png', 'max2.png', 'max3.png', 'max4.png'],
+  pepper: ['pepper.png', 'pepper2.png', 'pepper3.png'],
   gambit: ['gambit.png', 'gambit2.png', 'gambit3.png'],
   loki: ['loki.png', 'loki2.png', 'loki3.png'],
   genevieve: ['genevieve.png', 'genevieve2.png', 'genevieve3.png'],
