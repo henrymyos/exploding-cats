@@ -418,6 +418,15 @@ h1 { font-size: 2.2rem; margin: 0; }
 /* log */
 .log-toggle { position: fixed; top: 10px; right: 10px; z-index: 30; background: var(--panel); border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.2rem; cursor: pointer; color: var(--text); box-shadow: var(--shadow); }
 .menu-toggle { position: fixed; top: 10px; left: 10px; z-index: 30; background: var(--panel); border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.3rem; cursor: pointer; color: var(--text); box-shadow: var(--shadow); }
+
+/* keep UI clear of the iPhone notch / home indicator when added to home screen */
+@supports (padding: env(safe-area-inset-top)) {
+  .menu-toggle, .sound-toggle, .log-toggle { top: calc(10px + env(safe-area-inset-top)); }
+  .log-panel { padding-top: calc(16px + env(safe-area-inset-top)); }
+  .table-top { padding-top: env(safe-area-inset-top); }
+  .hand-area { padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
+  .home-card { margin-top: env(safe-area-inset-top); }
+}
 .log-panel {
   position: fixed; top: 0; right: -320px; width: 300px; height: 100%; background: var(--panel);
   z-index: 35; padding: 16px; box-shadow: var(--shadow); transition: right .2s; overflow-y: auto;
