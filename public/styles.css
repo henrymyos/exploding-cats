@@ -360,16 +360,24 @@ h1 { font-size: 2.2rem; margin: 0; }
     from { transform: translateX(-50%) scale(.9); opacity: 0; }
     to { transform: translateX(-50%) scale(1); opacity: 1; }
   }
-  /* reactions: a compact wrapping row under the corner buttons */
-  .react-bar { left: 6px; bottom: auto; top: 58px; flex-direction: row; flex-wrap: wrap; max-width: 46vw; gap: 2px; padding: 4px; }
-  .react-btn { font-size: 1.15rem; padding: 2px; }
+  /* corner buttons stay small; push the opponents below them so they're not covered */
   .sound-toggle { right: 58px; width: 38px; height: 38px; }
   .menu-toggle, .log-toggle { width: 38px; height: 38px; }
+  .table-top { padding-top: calc(48px + env(safe-area-inset-top)); min-height: 0; }
   .opponents { gap: 8px; }
-  .opp { min-width: 78px; padding: 6px 8px 5px; }
-  .opp .opp-name { max-width: 76px; font-size: .78rem; }
-  .opp-fan { height: 26px; }
-  .mini-back { width: 18px; height: 25px; margin-left: -9px; }
+  .opp { min-width: 74px; padding: 6px 8px 5px; }
+  .opp .opp-name { max-width: 72px; font-size: .76rem; }
+  .opp .opp-avatar { width: 24px; height: 24px; }
+  .opp-fan { height: 24px; }
+  .mini-back { width: 17px; height: 24px; margin-left: -9px; }
+  /* reactions: small vertical strip on the lower-left, clear of the opponents */
+  .react-bar { left: 6px; bottom: 30%; top: auto; flex-direction: column; flex-wrap: nowrap; gap: 2px; padding: 4px; }
+  .react-btn { font-size: 1.05rem; padding: 2px; }
+  /* smaller hand cards */
+  .card { width: 84px; height: 118px; }
+  .stack .card.fanned { margin-left: -66px; }
+  .corner-badge { width: 23px; height: 23px; top: 4px; right: 4px; }
+  .card .card-name { font-size: .58rem; padding: 4px 2px; }
   .reveal-card .card { width: 120px; height: 168px; }
   .avatar-opt { width: 46px; height: 46px; }
   .victory-avatar { width: 80px; height: 80px; }
@@ -429,7 +437,6 @@ h1 { font-size: 2.2rem; margin: 0; }
 @supports (padding: env(safe-area-inset-top)) {
   .menu-toggle, .sound-toggle, .log-toggle { top: calc(10px + env(safe-area-inset-top)); }
   .log-panel { padding-top: calc(16px + env(safe-area-inset-top)); }
-  .table-top { padding-top: env(safe-area-inset-top); }
   .hand-area { padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
   .home-card { margin-top: env(safe-area-inset-top); }
 }
@@ -469,6 +476,11 @@ h1 { font-size: 2.2rem; margin: 0; }
 }
 
 @media (max-width: 480px) {
-  .card { width: 98px; height: 138px; }
-  .pile-back, .card-mini { width: 88px; height: 124px; }
+  .card { width: 74px; height: 104px; }
+  .stack .card.fanned { margin-left: -58px; }
+  .corner-badge { width: 21px; height: 21px; }
+  .card .card-name { font-size: .54rem; }
+  .pile-back, .card-mini { width: 82px; height: 116px; }
+  .opp { min-width: 66px; }
+  .opp .opp-name { max-width: 64px; }
 }
