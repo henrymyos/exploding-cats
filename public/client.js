@@ -279,6 +279,10 @@ $('removeBotBtn').onclick = () => {
     if (!res.ok) toast(res.error, true);
   });
 };
+$('leaveLobbyBtn').onclick = () => {
+  socket.emit('leaveGame', { code: state.code, playerId: PLAYER_ID }, () => {});
+  goHome();
+};
 
 /* ---------------- game render ---------------- */
 function renderGame(g, lobby) {

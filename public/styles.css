@@ -115,6 +115,7 @@ h1 { font-size: 2.2rem; margin: 0; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.primary { background: linear-gradient(135deg, var(--accent), #ff8f6b); }
 .btn.danger { background: var(--danger); }
+.btn.ghost { background: transparent; border: 1px solid var(--panel-light); color: var(--muted); }
 
 .divider { position: relative; margin: 22px 0; color: var(--muted); font-size: .8rem; }
 .divider::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--panel-light); }

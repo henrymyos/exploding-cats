@@ -292,7 +292,7 @@ class RoomManager {
         (b) => isBotSeat(b) && b.alive && brain.chooseNope(g, b)
       );
       if (noper) {
-        room.botTimer = setTimeout(() => this.runBotJob(room, 'nope', noper.id), rand(500, 1400));
+        room.botTimer = setTimeout(() => this.runBotJob(room, 'nope', noper.id), rand(150, 400));
         return;
       }
       // Nobody can/will Hiss? Don't make everyone wait out the full window.
