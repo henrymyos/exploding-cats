@@ -76,9 +76,12 @@ html, body {
 
 /* ---------------- Home & Lobby ---------------- */
 #home, #lobby {
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16px;
   padding: 20px;
+  overflow-y: auto;
 }
 
 .home-card {
