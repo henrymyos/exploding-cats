@@ -159,6 +159,9 @@ h1 { font-size: 2.2rem; margin: 0; }
 
 /* avatar picker on the home screen */
 .avatar-picker { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.avatar-choice { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.avatar-name { font-size: 12px; color: var(--muted); font-weight: 600; }
+.avatar-choice:has(.avatar-opt.on) .avatar-name { color: var(--accent2); }
 .avatar-opt { width: 52px; height: 52px; border-radius: 50%; background-size: cover; background-position: center; border: 3px solid var(--panel-light); cursor: pointer; padding: 0; transition: transform .12s; }
 .avatar-opt:hover { transform: scale(1.08); }
 .avatar-opt.on { border-color: var(--accent2); box-shadow: 0 0 12px rgba(255,207,94,.6); transform: scale(1.06); }

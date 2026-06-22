@@ -94,9 +94,13 @@ let myAvatar = localStorage.getItem('ec_avatar') || AVATAR_CATS[Math.floor(Math.
 function renderAvatarPicker() {
   const box = $('avatarPicker');
   if (!box) return;
-  box.innerHTML = AVATAR_CATS.map((c) =>
-    `<button class="avatar-opt${c === myAvatar ? ' on' : ''}" data-cat="${c}" style="background-image:url('/assets/cats/${c}.png')" title="${c}"></button>`
-  ).join('');
+  box.innerHTML = AVATAR_CATS.map((c) => {
+    const label = c.charAt(0).toUpperCase() + c.slice(1);
+    return `<div class="avatar-choice">` +
+      `<button class="avatar-opt${c === myAvatar ? ' on' : ''}" data-cat="${c}" style="background-image:url('/assets/cats/${c}.png')" title="${label}"></button>` +
+      `<span class="avatar-name">${label}</span>` +
+    `</div>`;
+  }).join('');
   box.querySelectorAll('.avatar-opt').forEach((b) => {
     b.onclick = () => { myAvatar = b.dataset.cat; localStorage.setItem('ec_avatar', myAvatar); renderAvatarPicker(); Sound.resume(); };
   });
