@@ -219,6 +219,7 @@ class Game {
       kind: p.kind,
       actorId: p.actorId,
       actorName: this.playerById(p.actorId) ? this.playerById(p.actorId).name : '',
+      seq: p.seq || 0,
       nopeCount: p.nopes ? p.nopes.length : 0,
       noped: p.nopes ? p.nopes.length % 2 === 1 : false,
       // whoever made the most recent play in this chain — they can't Nope it

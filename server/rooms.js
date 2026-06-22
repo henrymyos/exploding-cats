@@ -296,11 +296,16 @@ class RoomManager {
         return;
       }
       // Nobody can/will Hiss? Don't make everyone wait out the full window.
+      // A human only counts if they're still eligible (not the last actor) and
+      // haven't tapped "✕" to decline this window.
+      const lastActor = p.nopes.length ? p.nopes[p.nopes.length - 1] : p.actorId;
+      const declined = p.declined || [];
       const humanHoldsHiss = g.players.some(
-        (pl) => !isBotSeat(pl) && pl.alive && pl.hand.some((c) => c.type === 'NOPE')
+        (pl) => !isBotSeat(pl) && pl.alive && pl.id !== lastActor &&
+          !declined.includes(pl.id) && pl.hand.some((c) => c.type === 'NOPE')
       );
-      if (!humanHoldsHiss && p.endsAt - Date.now() > 900) {
-        p.endsAt = Date.now() + 700;
+      if (!humanHoldsHiss && p.endsAt - Date.now() > 400) {
+        p.endsAt = Date.now() + 300;
         this.scheduleResolve(room);
       }
       return;

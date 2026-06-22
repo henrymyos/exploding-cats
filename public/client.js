@@ -828,7 +828,10 @@ function renderPending(g, me) {
   // made the most recent play (you can't Nope your own action or your own Nope).
   if (p.kind === 'action' && me && me.alive && p.lastActorId !== PLAYER_ID) {
     const hasNope = me.hand.some((c) => c.type === 'NOPE');
-    if (hasNope) {
+    // Once you've declined this exact window, keep the prompt hidden so play
+    // can move on without waiting out the timer. A counter-Nope changes the
+    // window key (lastActorId / nopeCount) and the prompt returns.
+    if (hasNope && declinedNopeKey !== nopeWindowKey(p)) {
       $('hissText').textContent = p.noped ? 'Action NOPED — counter it?' : (p.description || 'An action is happening!');
       $('hissBar').classList.remove('hidden');
     }
@@ -929,10 +932,24 @@ function showExplodeReveal(p) {
   };
 }
 
+// Identifies one Nope window. Changes whenever the chain advances (a Nope is
+// played), which re-opens the prompt for anyone who'd declined the prior state.
+function nopeWindowKey(p) { return `${p.seq}|${p.nopeCount}`; }
+let declinedNopeKey = null;
+
 $('hissBtn').onclick = () => {
   socket.emit('nope', { code: state.code, playerId: PLAYER_ID }, (res) => {
     if (!res.ok) toast(res.error, true);
   });
+};
+
+// "✕" — I won't Nope this. Tells the server to stop waiting on me so the
+// action can resolve as soon as nobody else wants to interrupt.
+$('hissDismiss').onclick = () => {
+  const p = state.game && state.game.pending;
+  if (p && p.kind === 'action') declinedNopeKey = nopeWindowKey(p);
+  $('hissBar').classList.add('hidden');
+  socket.emit('declineNope', { code: state.code, playerId: PLAYER_ID }, () => {});
 };
 
 let overlayMode = null;

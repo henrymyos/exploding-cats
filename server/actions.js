@@ -70,10 +70,13 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
   this.lastDiscardBy = player.id;
   this.logMsg(`${player.name} played ${card.name}.`);
 
+  this.actionSeq = (this.actionSeq || 0) + 1;
   this.pending = {
     kind: 'action',
     actorId: player.id,
+    seq: this.actionSeq,
     nopes: [],
+    declined: [],
     endsAt: Date.now() + NOPE_WINDOW_MS,
     description: this.describeAction(card.type, player, target),
     action: { type: card.type, targetId: target ? target.id : null },
@@ -109,10 +112,13 @@ Game.prototype.playCatCombo = function playCatCombo(player, cards, opts) {
     `${player.name} played ${cards.length} ${cards[0].name} cards on ${target.name}.`
   );
 
+  this.actionSeq = (this.actionSeq || 0) + 1;
   this.pending = {
     kind: 'action',
     actorId: player.id,
+    seq: this.actionSeq,
     nopes: [],
+    declined: [],
     endsAt: Date.now() + NOPE_WINDOW_MS,
     description:
       mode === 'random'
@@ -144,10 +150,26 @@ Game.prototype.playNope = function playNope(playerId) {
   this.discard.push(card);
   this.lastDiscardBy = playerId; // the Nope flies from whoever played it
   this.pending.nopes.push(playerId);
+  this.pending.declined = []; // the chain advanced — everyone gets to decide again
   this.pending.endsAt = Date.now() + NOPE_WINDOW_MS; // reopen the window for a counter-Nope
   const state = this.pending.nopes.length % 2 === 1 ? 'cancelled' : 'back on';
   this.logMsg(`${player.name} played Nope! The action is now ${state}.`);
   return ok({ window: true });
+};
+
+// A player declines to Nope the current action. Recording this lets the room
+// resolve early once nobody eligible still wants to interrupt, instead of
+// waiting out the full window.
+Game.prototype.declineNope = function declineNope(playerId) {
+  if (!this.pending || this.pending.kind !== 'action') return err('Nothing to decline right now.');
+  const player = this.playerById(playerId);
+  if (!player || !player.alive) return err('You are out of the game.');
+  const nopes = this.pending.nopes;
+  const lastActor = nopes.length ? nopes[nopes.length - 1] : this.pending.actorId;
+  if (lastActor === playerId) return ok({}); // not eligible anyway; nothing to record
+  if (!this.pending.declined) this.pending.declined = [];
+  if (!this.pending.declined.includes(playerId)) this.pending.declined.push(playerId);
+  return ok({});
 };
 
 // ------------------------------------------------------------------

@@ -129,6 +129,10 @@ io.on('connection', (socket) => {
     withGame(code, (g) => g.playNope(playerId), cb);
   });
 
+  socket.on('declineNope', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.declineNope(playerId), cb);
+  });
+
   socket.on('draw', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.drawCard(playerId), cb);
   });
