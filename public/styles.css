@@ -222,7 +222,8 @@ h1 { font-size: 2rem; margin: 0; }
 
 /* row 2: just the deck/discard, so they land at the exact vertical centre. */
 .table-center { align-self: center; display: flex; flex-direction: column; align-items: center; position: relative; }
-.piles { display: flex; gap: 28px; align-items: flex-end; }
+/* row-reverse: draw pile (first in markup) shows on the right, discard on the left */
+.piles { display: flex; flex-direction: row-reverse; gap: 28px; align-items: flex-end; }
 .pile { background: none; border: none; cursor: pointer; text-align: center; color: var(--text); }
 .pile-label { display: block; font-size: .7rem; color: var(--muted); margin-top: 4px; }
 .pile-back {
@@ -245,6 +246,17 @@ h1 { font-size: 2rem; margin: 0; }
 
 .turn-banner { font-size: 1.05rem; font-weight: 600; min-height: 1.4em; text-align: center; }
 .turn-banner.you { color: var(--accent2); }
+
+/* when it's your turn, glow a yellow ring around the whole screen edge */
+#game.my-turn::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 16;
+  box-shadow: inset 0 0 0 4px rgba(255, 207, 94, .9), inset 0 0 34px 4px rgba(255, 207, 94, .38);
+  animation: myTurnGlow 1.8s ease-in-out infinite;
+}
+@keyframes myTurnGlow {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; }
+}
 
 .pending-area { min-height: 1.2em; text-align: center; color: var(--muted); font-size: .9rem; }
 

@@ -252,6 +252,8 @@ function renderGame(g, lobby) {
   // come separately as g.hand. Attach them so the hand helpers can use me.hand.
   if (me) me.hand = g.hand || [];
   const isMyTurn = g.turnPlayerId === PLAYER_ID;
+  // glow the screen edge yellow while it's your turn
+  $('game').classList.toggle('my-turn', isMyTurn && g.phase === 'playing');
   // avatar lookup (avatars live on the lobby payload, not the game snapshot)
   const avById = {};
   (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; });

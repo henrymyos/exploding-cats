@@ -35,7 +35,8 @@ class Game {
     this.botMemory = {}; // botId -> { topCardId, topType } from a recent peek
     this.deck = [];
     this.discard = [];
-    this.turnIndex = 0;
+    // first turn is random, not always the game's creator
+    this.turnIndex = Math.floor(Math.random() * this.players.length);
     this.turnsRemaining = 1; // how many draws current player still owes (Attack stacks this)
     this.phase = 'playing'; // 'playing' | 'finished'
     this.winnerId = null;
@@ -47,6 +48,7 @@ class Game {
     this.lastDiscardBy = null; // id of whoever most recently sent a card to the discard
     this.shuffleSeq = 0;       // increments each time the draw pile is shuffled in play
     this.deal();
+    this.logMsg(`${this.currentPlayer().name} goes first!`);
   }
 
   // ---------- setup ----------
