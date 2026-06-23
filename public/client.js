@@ -1110,18 +1110,6 @@ function renderLog(log) {
 
 /* ---------------- card faces ---------------- */
 
-// Which cat's photo backs each action card (rotated so every cat shows up).
-const ACTION_ART = {
-  EXPLODE: 'gambit',
-  DEFUSE: 'max',
-  NOPE: 'pepper',
-  ATTACK: 'loki',
-  SKIP: 'genevieve',
-  FAVOR: 'max',
-  SHUFFLE: 'pepper',
-  FUTURE: 'gambit',
-};
-
 // Clean white line/solid icons drawn over the cat photo for each action.
 const GLYPHS = {
   EXPLODE: '<svg viewBox="0 0 64 64"><polygon points="32,2 39,22 60,16 45,32 60,48 39,42 32,62 25,42 4,48 19,32 4,16 25,22"/></svg>',
@@ -1215,12 +1203,28 @@ const CAT_PHOTOS = {
   genevieve: ['genevieve.png', 'genevieve2.png', 'genevieve3.png'],
 };
 
-// Every photo of every cat — action cards pull a random one from this pool.
+// Every photo of every cat — used only as a fallback pool.
 const ALL_PHOTOS = Object.values(CAT_PHOTOS).reduce((a, list) => a.concat(list), []);
 
+// Each action card TYPE owns an exclusive set of photos: a photo assigned to one
+// type never backs another, so e.g. an Attack photo can't also appear on Skip or
+// Favor. (These 16 entries cover every photo exactly once.)
+const ACTION_PHOTOS = {
+  EXPLODE:  ['gambit.png', 'gambit2.png'],
+  DEFUSE:   ['max.png', 'max2.png'],
+  NOPE:     ['pepper.png', 'pepper2.png'],
+  ATTACK:   ['loki.png', 'loki2.png'],
+  SKIP:     ['genevieve.png', 'genevieve2.png'],
+  FAVOR:    ['max3.png', 'max4.png'],
+  SHUFFLE:  ['pepper3.png', 'gambit3.png'],
+  FUTURE:   ['loki3.png', 'genevieve3.png'],
+};
+
 function photoFor(card) {
-  // Cat cards: a random photo OF THAT cat. Action cards: a random cat photo of any cat.
-  const list = card.type === 'CAT' ? (CAT_PHOTOS[card.cat] || [`${card.cat}.png`]) : ALL_PHOTOS;
+  // Cat cards: a photo OF THAT cat. Action cards: a photo from that type's own set.
+  const list = card.type === 'CAT'
+    ? (CAT_PHOTOS[card.cat] || [`${card.cat}.png`])
+    : (ACTION_PHOTOS[card.type] || ALL_PHOTOS);
   // hash the card id so each physical card keeps a stable photo, but copies vary
   const s = (card && (card.id || card.type)) || 'x';
   let h = 0;
