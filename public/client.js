@@ -362,40 +362,51 @@ function renderGame(g, lobby) {
 // Lay the opponents out along a downward-opening arc (a semicircle around the
 // table) instead of a flat row: the middle seats sit highest, the outer ones
 // curve down and tilt outward. Positions are absolute, computed from the count.
+// The horizontal spread is clamped to the real tile width so the end seats never
+// run off the side of the screen, and the seats are nudged down for breathing room.
 function arrangeOpponentsArc(container) {
   const opps = Array.from(container.children);
   const n = opps.length;
   if (!n) { container.style.height = ''; return; }
   const narrow = window.matchMedia('(max-width: 480px)').matches;
-  const EDGE = narrow ? 40 : 38;                  // max horizontal offset from centre (%)
-  const RY = narrow ? 60 : 80;                     // arc depth (px)
-  const spanDeg = n > 1 ? Math.min(30 * n, 150) : 0;
-  const half = (spanDeg / 2) * Math.PI / 180;
-  const Rx = n > 1 ? EDGE / Math.sin(half) : 0;     // horizontal radius so edges land at ±EDGE%
-  let maxY = 0;
-  opps.forEach((el, i) => {
-    const f = n > 1 ? (i / (n - 1) - 0.5) : 0;      // -0.5 (left) .. 0.5 (right)
-    const ang = f * spanDeg * Math.PI / 180;
-    const x = 50 + Rx * Math.sin(ang);              // centre, in %
-    const y = RY * (1 - Math.cos(ang));            // drop, in px (0 at top centre)
-    const rot = f * spanDeg * 0.34;                 // gentle outward tilt
-    el.style.left = x + '%';
-    el.style.top = y.toFixed(1) + 'px';
-    el.style.transform = `translateX(-50%) rotate(${rot.toFixed(1)}deg)`;
-    el.style.zIndex = el.classList.contains('active') ? '20' : String(Math.round(10 - Math.abs(f) * 8));
-    if (y > maxY) maxY = y;
-  });
-  // Reserve container height so the absolutely-positioned tiles don't spill onto
-  // the deck. renderGame can run while #game is still display:none (offsetHeight
-  // would be 0), so seed with an estimate, then correct once it's on screen.
-  const setHeight = () => {
-    let oppH = 0;
-    opps.forEach((el) => { if (el.offsetHeight > oppH) oppH = el.offsetHeight; });
-    if (!oppH) oppH = narrow ? 74 : 88;             // fallback while hidden
-    container.style.height = (maxY + oppH + 4) + 'px';
+  const short = window.innerHeight < 700;            // little vertical room — keep the arc shallow
+  const TILT = 13;                                  // max outward tilt (deg) — gentle, less side bleed
+  const RY = short ? (narrow ? 44 : 58) : (narrow ? 72 : 94); // arc depth (px) — deeper seats separate vertically
+  const BASE_TOP = short ? 3 : (narrow ? 6 : 10);    // push the whole arc down a touch
+  const spanDeg = n > 1 ? Math.min(26 * n, 130) : 0;
+  const halfAng = (spanDeg / 2) * Math.PI / 180;
+  const sinHalf = Math.sin(halfAng) || 1;
+
+  const layout = () => {
+    let tileW = 0, tileH = 0;
+    opps.forEach((el) => { tileW = Math.max(tileW, el.offsetWidth); tileH = Math.max(tileH, el.offsetHeight); });
+    if (!tileW) { tileW = narrow ? 88 : 104; tileH = narrow ? 74 : 88; }   // fallback while hidden
+    const cw = container.clientWidth || container.getBoundingClientRect().width || window.innerWidth;
+    // widest horizontal reach of a tilted tile from its centre, so it stays on screen
+    const tiltR = TILT * Math.PI / 180;
+    const halfExtent = (tileW / 2) * Math.cos(tiltR) + (tileH / 2) * Math.sin(tiltR);
+    const maxOffset = Math.max(0, cw / 2 - halfExtent - 4);     // px the edge seat may sit from centre
+    const desired = cw * (narrow ? 0.30 : 0.34);                 // px preferred spread
+    const edgeOffset = Math.min(desired, maxOffset);
+    let maxY = 0;
+    opps.forEach((el, i) => {
+      const f = n > 1 ? (i / (n - 1) - 0.5) : 0;     // -0.5 (left) .. 0.5 (right)
+      const ang = f * spanDeg * Math.PI / 180;
+      const xpx = cw / 2 + edgeOffset * (Math.sin(ang) / sinHalf);
+      const y = BASE_TOP + RY * (1 - Math.cos(ang));
+      const rot = f * TILT * 2;                       // -TILT .. +TILT across the row
+      el.style.left = xpx.toFixed(1) + 'px';
+      el.style.top = y.toFixed(1) + 'px';
+      el.style.transform = `translateX(-50%) rotate(${rot.toFixed(1)}deg)`;
+      el.style.zIndex = el.classList.contains('active') ? '20' : String(Math.round(10 - Math.abs(f) * 8));
+      if (y > maxY) maxY = y;
+    });
+    container.style.height = (maxY + tileH + 4) + 'px';
   };
-  setHeight();
-  requestAnimationFrame(setHeight);
+  // renderGame can run while #game is still display:none (offsets read 0), so lay
+  // out once with the fallback, then correct on the next frame when it's visible.
+  layout();
+  requestAnimationFrame(layout);
 }
 // Re-flow the arc on rotation / resize (the live game re-renders on its own).
 window.addEventListener('resize', () => {

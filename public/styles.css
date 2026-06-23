@@ -510,7 +510,9 @@ h1 { font-size: 2rem; margin: 0; }
    trimming the center piles and letting the hand scroll inside a shorter area. */
 @media (max-height: 700px) {
   .pile-back, .card-mini { width: 78px; height: 110px; }
-  .table-center { gap: 8px; }
+  /* top-align the piles so a squeezed center can't float the deck UP into the
+     opponents arc; any overflow then falls below, where the hand scrolls. */
+  .table-center { gap: 8px; justify-content: flex-start; padding-top: 4px; }
   .turn-banner { font-size: .95rem; }
   .hand { max-height: 34vh; }
   .reveal-card .card { width: 104px; height: 146px; }
