@@ -295,14 +295,23 @@ function renderGame(g, lobby) {
   const avById = {};
   (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; });
 
-  // opponents (everyone but me) — show a fan of card backs for their hand
+  // opponents (everyone but me) — show a fan of card backs for their hand.
+  // Reuse the tiles across renders (keyed by player id) so their arc positions
+  // stay put; recreating them every action made each one re-animate out from the
+  // top-centre default. Only brand-new seats get placed fresh.
   const opp = $('opponents');
-  opp.innerHTML = '';
-  for (const p of g.players) {
-    if (p.id === PLAYER_ID) continue;
-    const div = document.createElement('div');
+  const prevOpp = new Map();
+  opp.querySelectorAll(':scope > .opp').forEach((el) => prevOpp.set(el.dataset.id, el));
+  const opponents = g.players.filter((p) => p.id !== PLAYER_ID);
+  const keepIds = new Set();
+  opponents.forEach((p, idx) => {
+    let div = prevOpp.get(p.id);
+    if (!div) {
+      div = document.createElement('div');
+      div.dataset.id = p.id;
+      div.dataset.fresh = '1';                       // place without the move animation
+    }
     div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead');
-    div.dataset.id = p.id;
     const fanCount = Math.min(p.handCount, 8);
     let fan = '';
     for (let i = 0; i < fanCount; i += 1) fan += '<span class="mini-back"></span>';
@@ -313,8 +322,10 @@ function renderGame(g, lobby) {
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
       `<div class="opp-fan">${fan}</div>` +
       `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
-    opp.appendChild(div);
-  }
+    if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
+    keepIds.add(p.id);
+  });
+  prevOpp.forEach((el, id) => { if (!keepIds.has(id)) el.remove(); });
   arrangeOpponentsArc(opp);
 
   $('deckCount').textContent = g.deckCount;
@@ -405,6 +416,8 @@ function arrangeOpponentsArc(container) {
       const xpx = cw / 2 + edgeOffset * sx[i];
       const y = BASE_TOP + RY * (1 - Math.cos(ang));
       const rot = f * TILT * 2;                       // -TILT .. +TILT across the row
+      // a brand-new seat must not animate in from the top-centre default
+      if (el.dataset.fresh) el.style.transition = 'none';
       el.style.left = xpx.toFixed(1) + 'px';
       el.style.top = y.toFixed(1) + 'px';
       el.style.transform = `translateX(-50%) rotate(${rot.toFixed(1)}deg)`;
@@ -416,7 +429,12 @@ function arrangeOpponentsArc(container) {
   // renderGame can run while #game is still display:none (offsets read 0), so lay
   // out once with the fallback, then correct on the next frame when it's visible.
   layout();
-  requestAnimationFrame(layout);
+  requestAnimationFrame(() => {
+    layout();
+    // restore transitions on freshly-placed seats so later moves (a player dies,
+    // the screen resizes) still animate smoothly.
+    opps.forEach((el) => { if (el.dataset.fresh) { delete el.dataset.fresh; el.style.transition = ''; } });
+  });
 }
 // Re-flow the arc on rotation / resize (the live game re-renders on its own).
 window.addEventListener('resize', () => {
