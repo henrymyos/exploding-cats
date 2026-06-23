@@ -78,7 +78,9 @@ html, body {
 #home, #lobby {
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  /* center when it fits, but top-align when taller than the screen so the title
+     stays reachable while scrolling */
+  justify-content: safe center;
   gap: 16px;
   padding: 20px;
   overflow-y: auto;
@@ -370,9 +372,11 @@ h1 { font-size: 2.2rem; margin: 0; }
   /* corner buttons stay small; push the opponents below them so they're not covered */
   .sound-toggle { right: 58px; width: 38px; height: 38px; }
   .menu-toggle, .log-toggle { width: 38px; height: 38px; }
-  .table-top { padding-top: calc(48px + env(safe-area-inset-top)); min-height: 0; }
-  .opponents { gap: 8px; }
-  .opp { min-width: 74px; padding: 6px 8px 5px; }
+  .table-top { padding-top: calc(48px + env(safe-area-inset-top)); min-height: 0; flex-shrink: 0; }
+  /* keep opponents on ONE row so a wrapped row can't spill onto the deck/discard;
+     scroll sideways if there are too many to fit, staying centered when they do. */
+  .opponents { gap: 8px; flex-wrap: nowrap; overflow-x: auto; justify-content: safe center; }
+  .opp { min-width: 74px; padding: 6px 8px 5px; flex-shrink: 0; }
   .opp .opp-name { max-width: 72px; font-size: .76rem; }
   .opp .opp-avatar { width: 24px; height: 24px; }
   .opp-fan { height: 24px; }
@@ -498,4 +502,14 @@ h1 { font-size: 2.2rem; margin: 0; }
   .pile-back, .card-mini { width: 82px; height: 116px; }
   .opp { min-width: 66px; }
   .opp .opp-name { max-width: 64px; }
+}
+
+/* short screens (small phones, landscape-ish): keep the whole table on screen by
+   trimming the center piles and letting the hand scroll inside a shorter area. */
+@media (max-height: 700px) {
+  .pile-back, .card-mini { width: 78px; height: 110px; }
+  .table-center { gap: 8px; }
+  .turn-banner { font-size: .95rem; }
+  .hand { max-height: 34vh; }
+  .reveal-card .card { width: 104px; height: 146px; }
 }
