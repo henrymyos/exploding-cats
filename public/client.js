@@ -396,7 +396,7 @@ function arrangeOpponentsArc(container) {
     // widest horizontal reach of a tilted tile from its centre, so it stays on screen
     const tiltR = TILT * Math.PI / 180;
     const halfExtent = (tileW / 2) * Math.cos(tiltR) + (tileH / 2) * Math.sin(tiltR);
-    const maxOffset = Math.max(0, cw / 2 - halfExtent - 4);     // px the edge seat may sit from centre
+    const maxOffset = Math.max(0, cw / 2 - halfExtent - 6);     // px the edge seat may sit from centre
     // normalised horizontal position (-1..1) of each seat along the arc
     const sx = opps.map((_, i) => {
       const f = n > 1 ? (i / (n - 1) - 0.5) : 0;
@@ -407,7 +407,9 @@ function arrangeOpponentsArc(container) {
     let minGap = Infinity;
     for (let i = 1; i < sx.length; i += 1) minGap = Math.min(minGap, sx[i] - sx[i - 1]);
     const needed = (n > 1 && minGap > 0) ? (tileW + 6) / minGap : 0;
-    const desired = cw * (narrow ? 0.32 : 0.36);
+    // spread toward the screen edges (leaving only a small margin) so the seats
+    // aren't bunched in the middle, but never tighter than the no-overlap minimum.
+    const desired = cw * (narrow ? 0.42 : 0.40);
     const edgeOffset = Math.min(maxOffset, Math.max(desired, needed));
     let maxY = 0;
     opps.forEach((el, i) => {
