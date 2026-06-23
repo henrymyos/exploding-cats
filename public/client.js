@@ -1069,12 +1069,17 @@ function showStealPick(p) {
 function showDefuse(maxIndex) {
   if (overlayMode === 'defuse') return;
   overlayMode = 'defuse';
+  // index 0 = top (next draw), maxIndex = bottom. Offer only positions that exist
+  // for the current deck size, skipping any that collapse onto another.
   const options = [];
-  options.push({ label: 'Top (next draw)', idx: 0 });
-  if (maxIndex >= 2) options.push({ label: '2nd from top', idx: 1 });
-  if (maxIndex >= 4) options.push({ label: 'Middle', idx: Math.floor(maxIndex / 2) });
-  options.push({ label: 'Bottom', idx: maxIndex });
-  options.push({ label: 'Random', idx: -1 });
+  const seen = new Set();
+  const add = (label, idx) => {
+    if (idx >= 0 && idx <= maxIndex && !seen.has(idx)) { seen.add(idx); options.push({ label, idx }); }
+  };
+  add('Top (next draw)', 0);
+  add('2nd from top', 1);
+  add('3rd from top', 2);
+  add('Bottom', maxIndex);
   openOverlay(`
     <h2>🧨 Defused!</h2>
     <p class="hint">Sneak the Exploding Kitten back where the others won't expect it:</p>
@@ -1084,8 +1089,7 @@ function showDefuse(maxIndex) {
   `, true);
   $('overlayBox').querySelectorAll('.choice').forEach((btn) => {
     btn.onclick = () => {
-      let idx = parseInt(btn.dataset.idx, 10);
-      if (idx === -1) idx = Math.floor(Math.random() * (maxIndex + 1));
+      const idx = parseInt(btn.dataset.idx, 10);
       socket.emit('defusePlace', { code: state.code, playerId: PLAYER_ID, index: idx }, (res) => {
         if (!res.ok) toast(res.error, true);
       });
