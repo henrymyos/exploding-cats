@@ -21,6 +21,17 @@ let selected = new Set(); // selected card ids in hand
 const $ = (id) => document.getElementById(id);
 const screens = { home: $('home'), lobby: $('lobby'), game: $('game') };
 
+// iOS home-screen (standalone) apps don't reliably fill the screen with %/vh/dvh,
+// which left a gap below the hand. Pin the app height to the real window height so
+// the game grid always reaches the bottom of the screen.
+function setAppHeight() {
+  const h = window.innerHeight;
+  if (h) document.documentElement.style.setProperty('--app-height', h + 'px');
+}
+setAppHeight();
+['resize', 'orientationchange', 'pageshow', 'load'].forEach((ev) =>
+  window.addEventListener(ev, () => setTimeout(setAppHeight, 120)));
+
 function showScreen(name) {
   for (const k of Object.keys(screens)) screens[k].classList.toggle('active', k === name);
 }

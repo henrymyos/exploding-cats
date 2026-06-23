@@ -71,10 +71,10 @@ html, body {
   100% { transform: translateY(102vh) rotate(720deg); opacity: .9; }
 }
 
-/* Use the dynamic viewport height directly, not a chain of percentage heights.
-   In an iOS home-screen (standalone) app the % chain doesn't fill the screen, so
-   the game grid fell short and the hand didn't reach the bottom. */
-.screen { display: none; height: 100vh; height: 100dvh; }
+/* Height comes from JS (--app-height = window.innerHeight) because iOS standalone
+   apps don't fill the screen with %/vh/dvh; fall back to dvh then vh. This keeps
+   the game grid reaching the bottom so the hand sits on the bottom edge. */
+.screen { display: none; height: 100vh; height: 100dvh; height: var(--app-height, 100dvh); }
 .screen.active { display: flex; }
 
 /* ---------------- Home & Lobby ---------------- */
