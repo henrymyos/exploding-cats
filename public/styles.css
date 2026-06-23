@@ -451,6 +451,7 @@ h1 { font-size: 2.2rem; margin: 0; }
 @supports (padding: env(safe-area-inset-top)) {
   .menu-toggle, .sound-toggle, .log-toggle { top: calc(10px + env(safe-area-inset-top)); }
   .log-panel { padding-top: calc(16px + env(safe-area-inset-top)); }
+  .log-close { top: calc(12px + env(safe-area-inset-top)); }
   .hand-area { padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
   .home-card { margin-top: env(safe-area-inset-top); }
 }
