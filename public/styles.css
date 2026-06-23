@@ -455,7 +455,6 @@ h1 { font-size: 2.2rem; margin: 0; }
 @supports (padding: env(safe-area-inset-top)) {
   .menu-toggle, .sound-toggle, .log-toggle { top: calc(10px + env(safe-area-inset-top)); }
   .log-panel { padding-top: calc(16px + env(safe-area-inset-top)); }
-  .log-close { top: calc(12px + env(safe-area-inset-top)); }
   .hand-area { padding-bottom: calc(4px + env(safe-area-inset-bottom)); }
   .home-card { margin-top: env(safe-area-inset-top); }
 }
@@ -464,7 +463,10 @@ h1 { font-size: 2.2rem; margin: 0; }
   z-index: 35; padding: 16px; box-shadow: var(--shadow); transition: right .2s; overflow-y: auto;
 }
 .log-panel.open { right: 0; }
-.log-close { position: absolute; top: 12px; right: 12px; z-index: 2; background: var(--panel-light); border: none; color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow); }
+/* env() resolves to 0 without a notch, so this is safe everywhere and — unlike an
+   @supports override — can't be undone by source order. Pushes the ✕ below the
+   status bar / battery in home-screen (standalone) mode so it's tappable. */
+.log-close { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 12px; z-index: 2; background: var(--panel-light); border: none; color: var(--text); width: 34px; height: 34px; border-radius: 9px; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow); }
 .log-close:hover { filter: brightness(1.15); }
 .log-panel h3 { margin-top: 40px; }
 .log-panel ul { list-style: none; padding: 0; margin: 0; }
