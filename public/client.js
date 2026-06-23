@@ -370,7 +370,7 @@ function arrangeOpponentsArc(container) {
   if (!n) { container.style.height = ''; return; }
   const narrow = window.matchMedia('(max-width: 480px)').matches;
   const short = window.innerHeight < 700;            // little vertical room — keep the arc shallow
-  const TILT = 13;                                  // max outward tilt (deg) — gentle, less side bleed
+  const TILT = 8;                                   // max outward tilt (deg) — gentle, less side bleed
   const RY = short ? (narrow ? 44 : 58) : (narrow ? 72 : 94); // arc depth (px) — deeper seats separate vertically
   const BASE_TOP = short ? 3 : (narrow ? 6 : 10);    // push the whole arc down a touch
   const spanDeg = n > 1 ? Math.min(26 * n, 130) : 0;
@@ -380,19 +380,29 @@ function arrangeOpponentsArc(container) {
   const layout = () => {
     let tileW = 0, tileH = 0;
     opps.forEach((el) => { tileW = Math.max(tileW, el.offsetWidth); tileH = Math.max(tileH, el.offsetHeight); });
-    if (!tileW) { tileW = narrow ? 88 : 104; tileH = narrow ? 74 : 88; }   // fallback while hidden
+    if (!tileW) { tileW = narrow ? 70 : 96; tileH = narrow ? 78 : 90; }   // fallback while hidden
     const cw = container.clientWidth || container.getBoundingClientRect().width || window.innerWidth;
     // widest horizontal reach of a tilted tile from its centre, so it stays on screen
     const tiltR = TILT * Math.PI / 180;
     const halfExtent = (tileW / 2) * Math.cos(tiltR) + (tileH / 2) * Math.sin(tiltR);
     const maxOffset = Math.max(0, cw / 2 - halfExtent - 4);     // px the edge seat may sit from centre
-    const desired = cw * (narrow ? 0.30 : 0.34);                 // px preferred spread
-    const edgeOffset = Math.min(desired, maxOffset);
+    // normalised horizontal position (-1..1) of each seat along the arc
+    const sx = opps.map((_, i) => {
+      const f = n > 1 ? (i / (n - 1) - 0.5) : 0;
+      return Math.sin(f * spanDeg * Math.PI / 180) / sinHalf;
+    });
+    // spread the seats just wide enough that tiles (+ a little air) never overlap,
+    // based on the tightest adjacent gap, but never past the screen edge.
+    let minGap = Infinity;
+    for (let i = 1; i < sx.length; i += 1) minGap = Math.min(minGap, sx[i] - sx[i - 1]);
+    const needed = (n > 1 && minGap > 0) ? (tileW + 6) / minGap : 0;
+    const desired = cw * (narrow ? 0.32 : 0.36);
+    const edgeOffset = Math.min(maxOffset, Math.max(desired, needed));
     let maxY = 0;
     opps.forEach((el, i) => {
       const f = n > 1 ? (i / (n - 1) - 0.5) : 0;     // -0.5 (left) .. 0.5 (right)
       const ang = f * spanDeg * Math.PI / 180;
-      const xpx = cw / 2 + edgeOffset * (Math.sin(ang) / sinHalf);
+      const xpx = cw / 2 + edgeOffset * sx[i];
       const y = BASE_TOP + RY * (1 - Math.cos(ang));
       const rot = f * TILT * 2;                       // -TILT .. +TILT across the row
       el.style.left = xpx.toFixed(1) + 'px';
