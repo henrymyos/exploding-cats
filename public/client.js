@@ -34,58 +34,10 @@ function toast(msg, isErr) {
   toast._t = setTimeout(() => t.classList.add('hidden'), 2600);
 }
 
-/* ---------------- sound (synthesized, no asset files) ---------------- */
-const Sound = (() => {
-  let ctx = null;
-  let muted = localStorage.getItem('ec_muted') === '1';
-  const ac = () => { if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)(); return ctx; };
-  function beep(freq, dur, opt = {}) {
-    const c = ac();
-    const t = c.currentTime + (opt.delay || 0);
-    const o = c.createOscillator();
-    const g = c.createGain();
-    o.type = opt.type || 'sine';
-    o.frequency.setValueAtTime(freq, t);
-    if (opt.slideTo) o.frequency.exponentialRampToValueAtTime(opt.slideTo, t + dur);
-    g.gain.setValueAtTime(opt.gain || 0.16, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    o.connect(g); g.connect(c.destination);
-    o.start(t); o.stop(t + dur + 0.02);
-  }
-  function noise(dur, opt = {}) {
-    const c = ac();
-    const t = c.currentTime + (opt.delay || 0);
-    const buf = c.createBuffer(1, Math.max(1, c.sampleRate * dur), c.sampleRate);
-    const d = buf.getChannelData(0);
-    for (let i = 0; i < d.length; i += 1) d[i] = Math.random() * 2 - 1;
-    const src = c.createBufferSource(); src.buffer = buf;
-    const f = c.createBiquadFilter(); f.type = opt.hp ? 'highpass' : 'lowpass'; f.frequency.value = opt.freq || 1800;
-    const g = c.createGain();
-    g.gain.setValueAtTime(opt.gain || 0.18, t);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(c.destination);
-    src.start(t); src.stop(t + dur + 0.02);
-  }
-  const sounds = {
-    draw() { beep(320, 0.16, { slideTo: 620, type: 'sine', gain: 0.12 }); noise(0.12, { gain: 0.05, freq: 2600 }); },
-    play() { beep(540, 0.1, { type: 'triangle', gain: 0.12 }); },
-    discard() { noise(0.1, { gain: 0.12, freq: 3000, hp: true }); },
-    shuffle() { for (let i = 0; i < 6; i += 1) noise(0.05, { gain: 0.1, freq: 4000, hp: true, delay: i * 0.06 }); },
-    explode() { noise(0.5, { gain: 0.3, freq: 700 }); beep(140, 0.5, { slideTo: 40, type: 'sawtooth', gain: 0.22 }); },
-    nope() { beep(420, 0.14, { slideTo: 210, type: 'square', gain: 0.13 }); beep(300, 0.16, { slideTo: 150, type: 'square', gain: 0.12, delay: 0.14 }); },
-    react() { beep(720, 0.08, { type: 'sine', gain: 0.1 }); },
-    turn() { beep(660, 0.1, { gain: 0.09 }); beep(880, 0.1, { gain: 0.09, delay: 0.1 }); },
-    victory() { [523, 659, 784, 1047].forEach((f, i) => beep(f, 0.22, { gain: 0.14, type: 'triangle', delay: i * 0.13 })); },
-  };
-  return {
-    isMuted: () => muted,
-    toggle() { muted = !muted; localStorage.setItem('ec_muted', muted ? '1' : '0'); if (!muted) { try { ac().resume(); } catch (e) {} } return muted; },
-    resume() { try { ac().resume(); } catch (e) {} },
-    play(name) { if (muted) return; try { ac().resume(); sounds[name] && sounds[name](); } catch (e) {} },
-  };
-})();
-// browsers need a gesture before audio; warm it up on first interaction
-document.addEventListener('pointerdown', () => Sound.resume(), { once: true });
+/* ---------------- sound: disabled — the game is fully silent ----------------
+   No-op stub keeps every Sound.play()/resume() call site working without ever
+   creating an AudioContext or emitting any noise. */
+const Sound = { isMuted: () => true, toggle() { return true; }, resume() {}, play() {} };
 
 /* ---------------- avatar (which cat represents you) ---------------- */
 const AVATAR_CATS = ['max', 'pepper', 'gambit', 'loki', 'genevieve'];
@@ -110,8 +62,6 @@ function renderAvatarPicker() {
 fetch('/api/cats').then((r) => r.json()).then((c) => { CATS = c; }).catch(() => {});
 renderAvatarPicker();
 
-$('soundToggle').onclick = () => { const m = Sound.toggle(); $('soundToggle').textContent = m ? '🔇' : '🔊'; if (!m) Sound.play('react'); };
-if (Sound.isMuted()) $('soundToggle').textContent = '🔇';
 
 /* ---------------- quick reactions ---------------- */
 const REACT_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];

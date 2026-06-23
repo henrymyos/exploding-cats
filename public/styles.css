@@ -71,7 +71,10 @@ html, body {
   100% { transform: translateY(102vh) rotate(720deg); opacity: .9; }
 }
 
-.screen { display: none; height: 100%; }
+/* Use the dynamic viewport height directly, not a chain of percentage heights.
+   In an iOS home-screen (standalone) app the % chain doesn't fill the screen, so
+   the game grid fell short and the hand didn't reach the bottom. */
+.screen { display: none; height: 100vh; height: 100dvh; }
 .screen.active { display: flex; }
 
 /* ---------------- Home & Lobby ---------------- */
