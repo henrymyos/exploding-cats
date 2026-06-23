@@ -144,10 +144,13 @@ h1 { font-size: 2.2rem; margin: 0; }
 #game { flex-direction: column; padding: 8px; }
 
 .table-top { min-height: 132px; }
-.opponents { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; padding-top: 6px; }
+/* opponents are laid out on an arc (a semicircle around the table) by JS, which
+   sets each .opp's left/top/transform and the container's height. */
+.opponents { position: relative; width: 100%; padding-top: 6px; }
 .opp {
   background: var(--panel); border-radius: 12px; padding: 8px 12px 6px; min-width: 96px; text-align: center;
-  border: 2px solid transparent; position: relative;
+  border: 2px solid transparent; position: absolute; left: 50%; top: 0;
+  transform: translateX(-50%); transition: top .3s ease, left .3s ease, transform .3s ease;
 }
 .opp.active { border-color: var(--accent2); box-shadow: 0 0 16px rgba(255,207,94,.5); }
 .opp.dead { opacity: .4; filter: grayscale(1); }
@@ -373,10 +376,7 @@ h1 { font-size: 2.2rem; margin: 0; }
   .sound-toggle { right: 58px; width: 38px; height: 38px; }
   .menu-toggle, .log-toggle { width: 38px; height: 38px; }
   .table-top { padding-top: calc(48px + env(safe-area-inset-top)); min-height: 0; flex-shrink: 0; }
-  /* keep opponents on ONE row so a wrapped row can't spill onto the deck/discard;
-     scroll sideways if there are too many to fit, staying centered when they do. */
-  .opponents { gap: 8px; flex-wrap: nowrap; overflow-x: auto; justify-content: safe center; }
-  .opp { min-width: 74px; padding: 6px 8px 5px; flex-shrink: 0; }
+  .opp { min-width: 74px; padding: 6px 8px 5px; }
   .opp .opp-name { max-width: 72px; font-size: .76rem; }
   .opp .opp-avatar { width: 24px; height: 24px; }
   .opp-fan { height: 24px; }

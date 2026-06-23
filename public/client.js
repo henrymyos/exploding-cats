@@ -315,6 +315,7 @@ function renderGame(g, lobby) {
       `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
     opp.appendChild(div);
   }
+  arrangeOpponentsArc(opp);
 
   $('deckCount').textContent = g.deckCount;
   $('deckLeft').textContent = g.deckCount;
@@ -357,6 +358,50 @@ function renderGame(g, lobby) {
   if (g.phase === 'finished') showVictory(g, lobby);
   else hideVictory();
 }
+
+// Lay the opponents out along a downward-opening arc (a semicircle around the
+// table) instead of a flat row: the middle seats sit highest, the outer ones
+// curve down and tilt outward. Positions are absolute, computed from the count.
+function arrangeOpponentsArc(container) {
+  const opps = Array.from(container.children);
+  const n = opps.length;
+  if (!n) { container.style.height = ''; return; }
+  const narrow = window.matchMedia('(max-width: 480px)').matches;
+  const EDGE = narrow ? 40 : 38;                  // max horizontal offset from centre (%)
+  const RY = narrow ? 60 : 80;                     // arc depth (px)
+  const spanDeg = n > 1 ? Math.min(30 * n, 150) : 0;
+  const half = (spanDeg / 2) * Math.PI / 180;
+  const Rx = n > 1 ? EDGE / Math.sin(half) : 0;     // horizontal radius so edges land at ±EDGE%
+  let maxY = 0;
+  opps.forEach((el, i) => {
+    const f = n > 1 ? (i / (n - 1) - 0.5) : 0;      // -0.5 (left) .. 0.5 (right)
+    const ang = f * spanDeg * Math.PI / 180;
+    const x = 50 + Rx * Math.sin(ang);              // centre, in %
+    const y = RY * (1 - Math.cos(ang));            // drop, in px (0 at top centre)
+    const rot = f * spanDeg * 0.34;                 // gentle outward tilt
+    el.style.left = x + '%';
+    el.style.top = y.toFixed(1) + 'px';
+    el.style.transform = `translateX(-50%) rotate(${rot.toFixed(1)}deg)`;
+    el.style.zIndex = el.classList.contains('active') ? '20' : String(Math.round(10 - Math.abs(f) * 8));
+    if (y > maxY) maxY = y;
+  });
+  // Reserve container height so the absolutely-positioned tiles don't spill onto
+  // the deck. renderGame can run while #game is still display:none (offsetHeight
+  // would be 0), so seed with an estimate, then correct once it's on screen.
+  const setHeight = () => {
+    let oppH = 0;
+    opps.forEach((el) => { if (el.offsetHeight > oppH) oppH = el.offsetHeight; });
+    if (!oppH) oppH = narrow ? 74 : 88;             // fallback while hidden
+    container.style.height = (maxY + oppH + 4) + 'px';
+  };
+  setHeight();
+  requestAnimationFrame(setHeight);
+}
+// Re-flow the arc on rotation / resize (the live game re-renders on its own).
+window.addEventListener('resize', () => {
+  const c = document.getElementById('opponents');
+  if (c && c.children.length) arrangeOpponentsArc(c);
+});
 
 // A soft chime when your turn begins (and no blocking pending).
 let prevWasMyTurn = false;
