@@ -829,12 +829,11 @@ function cycleGroup(grp, g, me) {
   const k = grp.cards.filter((c) => selected.has(c.id)).length;
   const catLike = grp.isCat || grp.type === 'FERAL';
   if (catLike) {
-    // cycle this stack 0 -> 1 -> 2 -> 3 (capped by what you hold), keeping any
-    // other cat-like cards already chosen.
-    const maxN = Math.min(grp.cards.length, 3);
-    const steps = [];
-    for (let i = 1; i <= maxN; i += 1) steps.push(i);
-    steps.push(0);
+    // Pair-first: a stack you hold 2+ of jumps straight to a pair on the first
+    // tap (the common play), then trio, then a single (for a Feral combo), then
+    // off. Singletons just toggle on/off. Other cat-like picks are preserved.
+    const m = grp.cards.length;
+    const steps = m >= 3 ? [2, 3, 1, 0] : m === 2 ? [2, 1, 0] : [1, 0];
     const newK = steps[(steps.indexOf(k) + 1) % steps.length];
     const others = [...selected].filter((id) => {
       const c = me.hand.find((x) => x.id === id);
