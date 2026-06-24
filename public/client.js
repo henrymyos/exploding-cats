@@ -216,15 +216,15 @@ function renderLobby(lobby) {
   const expansions = lobby.expansions || [];
   const expBox = $('expansionSelect');
   expBox.classList.toggle('readonly', !isCreator);
-  expBox.querySelectorAll('.exp-opt').forEach((label) => {
-    const cb = label.querySelector('input');
-    const on = expansions.includes(cb.dataset.exp);
-    cb.checked = on;
-    cb.disabled = !isCreator;
-    label.classList.toggle('on', on);
-    cb.onchange = isCreator ? () => {
-      socket.emit('setExpansion', { code: state.code, playerId: PLAYER_ID, key: cb.dataset.exp, on: cb.checked }, (res) => {
-        if (res && !res.ok) { toast(res.error, true); cb.checked = !cb.checked; }
+  expBox.querySelectorAll('.exp-opt').forEach((btn) => {
+    const key = btn.dataset.exp;
+    const on = expansions.includes(key);
+    btn.classList.toggle('on', on);
+    btn.disabled = !isCreator;
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.onclick = isCreator ? () => {
+      socket.emit('setExpansion', { code: state.code, playerId: PLAYER_ID, key, on: !on }, (res) => {
+        if (res && !res.ok) toast(res.error, true);
       });
     } : null;
   });

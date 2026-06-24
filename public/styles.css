@@ -151,16 +151,45 @@ h1 { font-size: 2rem; margin: 0; }
 .mode-select.readonly .mode-opt { opacity: .45; }
 .mode-select.readonly .mode-opt.on { opacity: 1; }
 
-/* expansion toggles */
-.expansion-select { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
-.exp-title { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-.exp-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--bg2); cursor: pointer; }
-.exp-opt input { width: 20px; height: 20px; accent-color: var(--accent2); flex-shrink: 0; }
-.exp-opt b { display: block; font-size: .85rem; }
-.exp-opt small { display: block; font-size: .66rem; color: var(--muted); }
-.exp-opt.on { background: var(--panel-light); box-shadow: inset 0 0 0 1px var(--accent2); }
-.expansion-select.readonly .exp-opt { cursor: default; opacity: .6; }
-.expansion-select.readonly .exp-opt.on { opacity: 1; }
+/* expansion toggles — a colour-accented tile per expansion with an iOS switch */
+.expansion-select { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 4px; }
+.exp-title { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; }
+.exp-title small { text-transform: none; letter-spacing: 0; font-weight: 400; opacity: .7; margin-left: 4px; }
+
+.exp-opt {
+  --exp: var(--accent2);
+  display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
+  padding: 9px 11px; border-radius: 14px; cursor: pointer; color: var(--text);
+  background: var(--bg2); border: 1.5px solid transparent;
+  transition: border-color .18s, background .18s, box-shadow .18s;
+}
+.exp-opt[data-exp="imploding"] { --exp: #ff9f4a; }
+.exp-opt[data-exp="streaking"] { --exp: #ff8fcf; }
+.exp-opt[data-exp="zombie"]    { --exp: #8fc46b; }
+.exp-opt:not(:disabled):hover { background: var(--panel-light); }
+
+.exp-icon {
+  width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center;
+  font-size: 1.15rem; background: rgba(255,255,255,.06); transition: background .18s, transform .18s;
+}
+.exp-info { flex: 1; min-width: 0; line-height: 1.15; }
+.exp-info b { display: block; font-size: .88rem; }
+.exp-info small { display: block; font-size: .66rem; color: var(--muted); margin-top: 1px; }
+
+/* the switch */
+.exp-switch { position: relative; width: 42px; height: 24px; border-radius: 12px; flex-shrink: 0;
+  background: var(--panel-light); transition: background .2s; box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.exp-switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.4); transition: transform .2s; }
+
+/* on state */
+.exp-opt.on { border-color: var(--exp); background: color-mix(in srgb, var(--exp) 14%, var(--bg2)); box-shadow: 0 0 14px -4px var(--exp); }
+.exp-opt.on .exp-icon { background: var(--exp); transform: scale(1.04); }
+.exp-opt.on .exp-switch { background: var(--exp); }
+.exp-opt.on .exp-switch::after { transform: translateX(18px); }
+
+.expansion-select.readonly .exp-opt { cursor: default; }
+.expansion-select.readonly .exp-opt:not(.on) { opacity: .5; }
 
 .bot-controls { display: flex; gap: 8px; margin: 10px 0; }
 .bot-controls .btn { margin-top: 0; }

@@ -62,10 +62,22 @@
         </div>
         <p id="modeHint" class="hint mode-hint"></p>
         <div id="expansionSelect" class="expansion-select">
-          <span class="exp-title">Expansions</span>
-          <label class="exp-opt"><input type="checkbox" data-exp="imploding"><span><b>Imploding Kittens</b><small>un-defusable kitten + Reverse</small></span></label>
-          <label class="exp-opt"><input type="checkbox" data-exp="streaking"><span><b>Streaking Kittens</b><small>hold a kitten, Mark &amp; Swap</small></span></label>
-          <label class="exp-opt"><input type="checkbox" data-exp="zombie"><span><b>Zombie mode</b><small>death isn't the end</small></span></label>
+          <span class="exp-title">Expansions <small>mix &amp; match</small></span>
+          <button class="exp-opt" data-exp="imploding">
+            <span class="exp-icon">☢️</span>
+            <span class="exp-info"><b>Imploding Kittens</b><small>Un-defusable kitten + Reverse</small></span>
+            <span class="exp-switch"></span>
+          </button>
+          <button class="exp-opt" data-exp="streaking">
+            <span class="exp-icon">😼</span>
+            <span class="exp-info"><b>Streaking Kittens</b><small>Hold a kitten · Mark &amp; Swap</small></span>
+            <span class="exp-switch"></span>
+          </button>
+          <button class="exp-opt" data-exp="zombie">
+            <span class="exp-icon">🧟</span>
+            <span class="exp-info"><b>Zombie mode</b><small>Death isn't the end</small></span>
+            <span class="exp-switch"></span>
+          </button>
         </div>
         <ul id="lobbyPlayers" class="player-list"></ul>
         <div id="botControls" class="bot-controls">
