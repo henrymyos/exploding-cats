@@ -357,6 +357,7 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
       actor.hand.push(stolen);
       this.recordTransfer(stolen, target, actor);
       this.logMsg(`${actor.name} demanded and took a ${stolen.name} from ${target.name}.`);
+      this.checkStreakLoss(target);
     }
   }
 };
@@ -402,6 +403,7 @@ Game.prototype.stealTake = function stealTake(playerId, index) {
   this.recordTransfer(stolen, target, actor);
   this.logMsg(`${actor.name} swiped a card from ${target.name}.`);
   this.pending = null;
+  this.checkStreakLoss(target);
   this.checkWin();
   return ok();
 };
@@ -429,6 +431,7 @@ Game.prototype.favorGive = function favorGive(playerId, cardId) {
   this.recordTransfer(card, target, actor);
   this.logMsg(`${target.name} gave a card to ${actor.name}.`);
   this.pending = null;
+  this.checkStreakLoss(target);
   this.checkWin();
   return ok();
 };
@@ -639,6 +642,25 @@ Game.prototype.eliminate = function eliminate(player, card, icon, verb) {
   this.turnsRemaining = 1;
   this.turnsFromAttack = false; // their attack-turns die with them
   this.nextAlive(this.direction);
+};
+
+// If a player loses their last Streaking Kitten while holding a live Exploding
+// Kitten, the cat's out of the bag and they explode. Call after any card leaves
+// a hand via Favor/steal.
+Game.prototype.checkStreakLoss = function checkStreakLoss(player) {
+  if (!player || !player.alive) return;
+  const kitten = player.hand.some((c) => c.type === 'EXPLODE');
+  const streak = player.hand.some((c) => c.type === 'STREAK');
+  if (kitten && !streak) {
+    while (player.hand.length) this.discard.push(player.hand.pop());
+    player.alive = false;
+    if (!this.deadOrder.includes(player.id)) this.deadOrder.push(player.id);
+    this.lastDiscardBy = player.id;
+    this.logMsg(`💥 ${player.name} lost their Streaking Kitten and exploded!`);
+    if (this.currentPlayer() && this.currentPlayer().id === player.id) {
+      this.turnsRemaining = 1; this.turnsFromAttack = false; this.nextAlive(this.direction);
+    }
+  }
 };
 
 // ---- Imploding Kitten (un-defusable) ----

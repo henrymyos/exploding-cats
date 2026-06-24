@@ -318,11 +318,12 @@ function renderGame(g, lobby) {
     const marked = (p.marked && p.marked.length)
       ? `<div class="opp-marked">🔖 ${p.marked.map((c) => escapeHtml(c.name)).join(', ')}</div>`
       : '';
+    const streak = p.streaking ? `<div class="opp-streak">🙀 holding a kitten!</div>` : '';
     div.innerHTML =
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
       `<div class="opp-fan">${fan}</div>` +
       `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>` +
-      marked;
+      streak + marked;
     if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
     keepIds.add(p.id);
   });
@@ -1502,6 +1503,73 @@ function cardFace(card) {
 function miniFace(card) {
   return cardFace(card);
 }
+
+/* ---------------- card tooltips (hover / press-and-hold) ---------------- */
+const CARD_DESC = {
+  EXPLODE: 'Draw one and you’re out — unless you can defuse it.',
+  DEFUSE: 'Survive an Exploding Kitten and secretly slip it back into the deck.',
+  NOPE: 'Cancel another player’s action. Play a Nope on a Nope to undo it.',
+  ATTACK: 'End your turn without drawing and force the next player to take two turns (they stack: 2 → 4 → 6).',
+  SKIP: 'End your turn immediately without drawing a card.',
+  FAVOR: 'Force a player to give you one card — of their choosing.',
+  SHUFFLE: 'Shuffle the draw pile.',
+  FUTURE: 'Privately look at the top three cards of the deck.',
+  CAT: 'No power alone. Play 2 matching cats to steal a random card, or 3 to demand a specific card type.',
+  TARGETED_ATTACK: 'End your turn and force ANY player you choose to take two turns.',
+  ALTER: 'Privately view AND rearrange the top three cards of the deck.',
+  DRAW_BOTTOM: 'End your turn by drawing the BOTTOM card instead of the top.',
+  FERAL: 'A wild cat — use it as any cat in a pair or three-of-a-kind.',
+  IMPLODE: 'Can’t be defused. The first draw flips it face-up and you reposition it; the next draw is fatal.',
+  REVERSE: 'Reverse the turn order and end your turn without drawing.',
+  STREAK: 'While you hold this, you can keep a live Exploding Kitten in your hand without dying. Lose it and you explode!',
+  MARK: 'Flip a random card in another player’s hand face-up for everyone to see.',
+  SWAP_TB: 'Swap the top and bottom cards of the draw pile.',
+  ZOMBIE: 'Survive an Exploding Kitten — and drag a dead player back to life.',
+};
+
+function showCardTip(el) {
+  const type = el.dataset.type;
+  const desc = CARD_DESC[type];
+  if (!desc) return;
+  const nameEl = el.querySelector('.card-name');
+  const name = nameEl ? nameEl.textContent : (type || '');
+  const tip = $('cardTip');
+  tip.innerHTML = `<b>${escapeHtml(name)}</b><span>${escapeHtml(desc)}</span>`;
+  tip.classList.remove('hidden');
+  const r = el.getBoundingClientRect();
+  const tr = tip.getBoundingClientRect();
+  let left = r.left + r.width / 2 - tr.width / 2;
+  left = Math.max(6, Math.min(left, window.innerWidth - tr.width - 6));
+  let top = r.top - tr.height - 8;
+  if (top < 6) top = r.bottom + 8; // flip below if no room above
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+function hideCardTip() { $('cardTip').classList.add('hidden'); }
+
+// Desktop: hover. Mobile: press-and-hold (without triggering the tap-to-select).
+let tipPressTimer = null, tipSwallowClick = false;
+document.addEventListener('mouseover', (e) => {
+  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type]');
+  if (card) showCardTip(card);
+});
+document.addEventListener('mouseout', (e) => {
+  if (e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type]')) hideCardTip();
+});
+document.addEventListener('touchstart', (e) => {
+  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type]');
+  if (!card) return;
+  clearTimeout(tipPressTimer);
+  tipPressTimer = setTimeout(() => { tipSwallowClick = true; showCardTip(card); }, 380);
+}, { passive: true });
+function endPress() { clearTimeout(tipPressTimer); setTimeout(hideCardTip, 1400); }
+document.addEventListener('touchend', endPress);
+document.addEventListener('touchmove', () => { clearTimeout(tipPressTimer); hideCardTip(); });
+document.addEventListener('touchcancel', endPress);
+// swallow the click that follows a long-press so it doesn't also select the card
+document.addEventListener('click', (e) => {
+  if (tipSwallowClick) { tipSwallowClick = false; e.stopPropagation(); e.preventDefault(); }
+}, true);
 
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
