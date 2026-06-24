@@ -246,6 +246,7 @@ $('leaveLobbyBtn').onclick = () => {
 };
 
 /* ---------------- game render ---------------- */
+let lastArcSig = ''; // seat set the opponent arc was last laid out for
 function renderGame(g, lobby) {
   const me = g.players.find((p) => p.id === PLAYER_ID);
   // The player summary in g.players only has a handCount; our actual cards
@@ -289,7 +290,11 @@ function renderGame(g, lobby) {
     keepIds.add(p.id);
   });
   prevOpp.forEach((el, id) => { if (!keepIds.has(id)) el.remove(); });
-  arrangeOpponentsArc(opp);
+  // Only re-lay-out the arc when the set of seats actually changes (a player
+  // joins/leaves). Re-arranging on every render made tiles slide a few px each
+  // time a card count changed the tile width. (resize re-arranges separately.)
+  const arcSig = opponents.map((p) => p.id).join(',');
+  if (arcSig !== lastArcSig) { lastArcSig = arcSig; arrangeOpponentsArc(opp); }
 
   $('deckCount').textContent = g.deckCount;
   $('deckLeft').textContent = g.deckCount;
@@ -668,8 +673,7 @@ function groupHand(hand) {
 
 function renderHand(g, me, isMyTurn) {
   const hand = $('hand');
-  hand.innerHTML = '';
-  if (!me) return;
+  if (!me) { hand.innerHTML = ''; renderHandActions(g, me, isMyTurn); return; }
   // keep only still-held selections
   const held = new Set(me.hand.map((c) => c.id));
   selected = new Set([...selected].filter((id) => held.has(id)));
@@ -678,35 +682,59 @@ function renderHand(g, me, isMyTurn) {
   const giving = !!(g.pending && g.pending.kind === 'favorPick' && g.pending.youMustGive);
   hand.classList.toggle('giving', giving);
 
-  for (const grp of groupHand(me.hand)) {
+  // Reconcile (don't wipe): reuse each stack by group key and each card element by
+  // id, so unchanged photo-backed cards keep their DOM node and never repaint.
+  const groups = groupHand(me.hand);
+  const prevStacks = new Map();
+  hand.querySelectorAll(':scope > .stack').forEach((el) => prevStacks.set(el.dataset.key, el));
+  const keepKeys = new Set();
+
+  groups.forEach((grp, idx) => {
+    let stack = prevStacks.get(grp.key);
+    if (!stack) { stack = document.createElement('div'); stack.dataset.key = grp.key; }
     const selCount = grp.cards.filter((c) => selected.has(c.id)).length;
-    const stack = document.createElement('div');
     stack.className = 'stack' + (selCount > 0 ? ' sel' : '');
-    // fan up to 4 identical cards
-    grp.cards.slice(0, 4).forEach((card, i) => {
-      const el = document.createElement('div');
-      el.className = 'card';
-      el.dataset.type = card.type;
+
+    // reconcile the fanned cards (up to 4) by card id
+    const fanCards = grp.cards.slice(0, 4);
+    const prevCards = new Map();
+    stack.querySelectorAll(':scope > .card').forEach((el) => prevCards.set(el.dataset.cardId, el));
+    const keepCardIds = new Set();
+    fanCards.forEach((card, i) => {
+      let el = prevCards.get(card.id);
+      if (!el) {
+        el = document.createElement('div');
+        el.dataset.cardId = card.id;
+        el.dataset.type = card.type;
+        el.innerHTML = cardFace(card);            // build the photo once, then keep it
+      }
+      el.className = 'card' + (i > 0 ? ' fanned' : '');
       el.style.zIndex = String(i);
-      if (i > 0) el.classList.add('fanned');
-      el.innerHTML = cardFace(card);
-      stack.appendChild(el);
+      if (stack.children[i] !== el) stack.insertBefore(el, stack.children[i] || null);
+      keepCardIds.add(card.id);
     });
+    prevCards.forEach((el, id) => { if (!keepCardIds.has(id)) el.remove(); });
+
+    // count badge (×N) for stacks of 2+
+    let badge = stack.querySelector(':scope > .stack-count');
     if (grp.cards.length > 1) {
-      const badge = document.createElement('span');
-      badge.className = 'stack-count';
+      if (!badge) { badge = document.createElement('span'); badge.className = 'stack-count'; stack.appendChild(badge); }
       badge.textContent = '×' + grp.cards.length;
-      stack.appendChild(badge);
-    }
+    } else if (badge) { badge.remove(); }
+
+    // "N picked" pill while a selection is active
+    let pill = stack.querySelector(':scope > .stack-sel');
     if (selCount > 0) {
-      const pill = document.createElement('span');
-      pill.className = 'stack-sel';
+      if (!pill) { pill = document.createElement('span'); pill.className = 'stack-sel'; stack.appendChild(pill); }
       pill.textContent = selCount + ' picked';
-      stack.appendChild(pill);
-    }
+    } else if (pill) { pill.remove(); }
+
     stack.onclick = giving ? () => giveCard(grp.cards[0].id) : () => cycleGroup(grp, g, me);
-    hand.appendChild(stack);
-  }
+    if (hand.children[idx] !== stack) hand.insertBefore(stack, hand.children[idx] || null);
+    keepKeys.add(grp.key);
+  });
+  prevStacks.forEach((el, key) => { if (!keepKeys.has(key)) el.remove(); });
+
   renderHandActions(g, me, isMyTurn);
 }
 
@@ -1122,6 +1150,7 @@ function goHome() {
   hideVictory();      // the celebration is a separate fixed layer — hide it too
   hideDrawReveal();
   $('logPanel').classList.remove('open');
+  lastArcSig = '';    // force the arc to re-lay-out for the next game
   showScreen('home');
 }
 
