@@ -49,6 +49,7 @@ class Game {
     this.shuffleSeq = 0;       // increments each time the draw pile is shuffled in play
     this.turnPeeked = false;   // did the current turn's player look at the future?
     this.suspectTopId = null;  // top card id a player peeked-then-dodged (likely a kitten)
+    this.defuseWary = 0;       // draws of elevated caution after a kitten was defused back in
     this.deal();
     this.logMsg(`${this.currentPlayer().name} goes first!`);
   }

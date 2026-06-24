@@ -67,7 +67,10 @@ function chooseTurnAction(game, bot) {
   // the top is almost certainly an Exploding Cat. (Our own peek, if it says safe,
   // overrides this.)
   const suspectTop = !knownSafeTop && top && game.suspectTopId === top.id;
-  const risk = explodeRisk(game);
+  // Right after someone defuses a kitten back into the deck (often near the top),
+  // treat the next draws as riskier than the raw odds — be wary and peek/dodge.
+  const wary = game.defuseWary || 0;
+  const risk = Math.min(1, explodeRisk(game) + 0.11 * wary);
 
   // A way to avoid drawing the current top, best option first.
   const dodge = () => {

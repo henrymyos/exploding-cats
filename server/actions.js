@@ -212,6 +212,7 @@ Game.prototype.resolveAction = function resolveAction() {
       shuffle(this.deck);
       this.shuffleSeq = (this.shuffleSeq || 0) + 1;
       this.suspectTopId = null; // the suspected card moved somewhere unknown
+      this.defuseWary = 0;      // and a re-hidden kitten is no longer near the top
       this.logMsg('The draw pile was shuffled.');
       break;
     case 'FUTURE':
@@ -372,6 +373,7 @@ Game.prototype.drawCard = function drawCard(playerId) {
   if (!card) return err('The deck is empty.');
   // this draw consumes the top, so any standing suspicion about it is settled
   if (this.suspectTopId === card.id) this.suspectTopId = null;
+  if (this.defuseWary > 0) this.defuseWary -= 1; // post-defuse caution fades as cards come off
 
   if (card.type === 'EXPLODE') {
     // Reveal the Exploding Kitten to everyone first (dramatic pause), then resolve.
@@ -465,6 +467,9 @@ Game.prototype.defusePlace = function defusePlace(playerId, index) {
   const insertAt = this.deck.length - i;
   this.deck.splice(insertAt, 0, card);
   this.logMsg(`The Exploding Kitten is back in the deck somewhere...`);
+  // a kitten was just hidden back in the deck (defusers love the top) — make the
+  // next few draws "wary" so bots peek/dodge instead of blindly drawing into it.
+  this.defuseWary = 3;
   this.pending = null;
   this.advanceTurn();
   this.checkWin();
