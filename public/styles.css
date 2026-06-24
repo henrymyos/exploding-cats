@@ -138,6 +138,15 @@ h1 { font-size: 2rem; margin: 0; }
 .player-list .host-tag { margin-left: auto; font-size: .7rem; color: var(--accent2); }
 .player-list .bot-tag { margin-left: auto; font-size: .7rem; color: var(--accent); }
 
+/* deck mode selector (lobby) */
+.mode-select { display: flex; gap: 8px; margin: 12px 0; }
+.mode-opt { flex: 1; padding: 10px 8px; border-radius: 12px; border: 2px solid var(--panel-light); background: var(--bg2); color: var(--text); cursor: pointer; text-align: center; line-height: 1.2; }
+.mode-opt b { display: block; font-size: .95rem; }
+.mode-opt small { display: block; font-size: .66rem; color: var(--muted); margin-top: 2px; }
+.mode-opt.on { border-color: var(--accent2); background: var(--panel-light); box-shadow: 0 0 10px rgba(255,207,94,.4); }
+.mode-opt:disabled { cursor: default; opacity: .9; }
+.mode-opt.on small { color: var(--accent2); }
+
 .bot-controls { display: flex; gap: 8px; margin: 10px 0; }
 .bot-controls .btn { margin-top: 0; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); }
@@ -192,6 +201,27 @@ h1 { font-size: 2rem; margin: 0; }
 .opponents[data-count="3"] .opp-fan { height: 20px; }
 .opponents[data-count="3"] .mini-back { width: 13px; height: 20px; margin-left: -7px; }
 .opponents[data-count="3"] .opp .opp-cards { font-size: .68rem; }
+
+/* Party Pack with many opponents: very compact tiles, fan hidden for 6+ where
+   they're stacked into two rows (the "N cards" line still shows the count). */
+.opponents[data-count="6"] .opp, .opponents[data-count="7"] .opp,
+.opponents[data-count="8"] .opp, .opponents[data-count="9"] .opp,
+.opponents[data-count="10"] .opp { padding: 4px 6px 3px; min-width: 0; }
+.opponents[data-count="6"] .opp-head, .opponents[data-count="7"] .opp-head,
+.opponents[data-count="8"] .opp-head, .opponents[data-count="9"] .opp-head,
+.opponents[data-count="10"] .opp-head { flex-direction: column; gap: 1px; }
+.opponents[data-count="6"] .opp .opp-avatar, .opponents[data-count="7"] .opp .opp-avatar,
+.opponents[data-count="8"] .opp .opp-avatar, .opponents[data-count="9"] .opp .opp-avatar,
+.opponents[data-count="10"] .opp .opp-avatar { width: 24px; height: 24px; }
+.opponents[data-count="6"] .opp .opp-name, .opponents[data-count="7"] .opp .opp-name,
+.opponents[data-count="8"] .opp .opp-name, .opponents[data-count="9"] .opp .opp-name,
+.opponents[data-count="10"] .opp .opp-name { max-width: 50px; font-size: .58rem; }
+.opponents[data-count="6"] .opp .opp-cards, .opponents[data-count="7"] .opp .opp-cards,
+.opponents[data-count="8"] .opp .opp-cards, .opponents[data-count="9"] .opp .opp-cards,
+.opponents[data-count="10"] .opp .opp-cards { font-size: .54rem; }
+.opponents[data-count="6"] .opp-fan, .opponents[data-count="7"] .opp-fan,
+.opponents[data-count="8"] .opp-fan, .opponents[data-count="9"] .opp-fan,
+.opponents[data-count="10"] .opp-fan { display: none; }
 
 /* avatar in lists / lobby */
 .avatar { width: 30px; height: 30px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; border: 2px solid var(--panel-light); display: inline-block; vertical-align: middle; }
@@ -324,6 +354,10 @@ h1 { font-size: 2rem; margin: 0; }
 .card[data-type="FAVOR"] { background: linear-gradient(160deg, #d99bff, #8a3ad4); }
 .card[data-type="SHUFFLE"] { background: linear-gradient(160deg, #ffcf5e, #d49a2a); }
 .card[data-type="FUTURE"] { background: linear-gradient(160deg, #5ee0e0, #2a9da8); }
+.card[data-type="TARGETED_ATTACK"] { background: linear-gradient(160deg, #ff5e8a, #7a1540); }
+.card[data-type="ALTER"] { background: linear-gradient(160deg, #5ee0e0, #2a6ea8); }
+.card[data-type="DRAW_BOTTOM"] { background: linear-gradient(160deg, #ffcf5e, #b56a1a); }
+.card[data-type="FERAL"] { background: linear-gradient(160deg, #b07cff, #5a2a9d); }
 .card[data-type="CAT"] { background: linear-gradient(160deg, var(--panel-light), #2a2150); }
 
 /* the discard pile shows the played card's type color as a border + banner */
@@ -336,6 +370,10 @@ h1 { font-size: 2rem; margin: 0; }
 .card-mini[data-type="FAVOR"]   { border-color: #d99bff; background: linear-gradient(160deg, #d99bff, #8a3ad4); }
 .card-mini[data-type="SHUFFLE"] { border-color: #ffcf5e; background: linear-gradient(160deg, #ffcf5e, #d49a2a); }
 .card-mini[data-type="FUTURE"]  { border-color: #5ee0e0; background: linear-gradient(160deg, #5ee0e0, #2a9da8); }
+.card-mini[data-type="TARGETED_ATTACK"] { border-color: #ff5e8a; background: linear-gradient(160deg, #ff5e8a, #7a1540); }
+.card-mini[data-type="ALTER"]   { border-color: #5ee0e0; background: linear-gradient(160deg, #5ee0e0, #2a6ea8); }
+.card-mini[data-type="DRAW_BOTTOM"] { border-color: #ffcf5e; background: linear-gradient(160deg, #ffcf5e, #b56a1a); }
+.card-mini[data-type="FERAL"]   { border-color: #b07cff; background: linear-gradient(160deg, #b07cff, #5a2a9d); }
 .card-mini[data-type="CAT"]     { border-color: var(--accent2); background: linear-gradient(160deg, var(--panel-light), #2a2150); }
 
 /* stacked / fanned hand: identical cards grouped into one tappable pile */
@@ -459,8 +497,13 @@ h1 { font-size: 2rem; margin: 0; }
 .choice .choice-avatar { font-size: 1.9rem; display: block; }
 .choice .choice-name { display: block; color: #fff; font-weight: 800; font-size: 1.05rem; margin-top: 2px; }
 .choice .choice-sub { display: block; color: var(--accent2); font-size: .78rem; font-weight: 600; margin-top: 2px; }
-.future-row { display: flex; gap: 10px; justify-content: center; margin: 16px 0; }
-.future-row .label { font-size: .7rem; color: var(--muted); }
+.future-row { display: flex; gap: 10px; justify-content: center; margin: 16px 0; flex-wrap: wrap; }
+.future-row .label { font-size: .7rem; color: var(--muted); text-align: center; }
+.alter-card { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.alter-moves { display: flex; gap: 6px; }
+.alter-moves button { width: 34px; height: 30px; border-radius: 8px; border: none; background: var(--panel-light); color: var(--text); font-size: 1rem; cursor: pointer; }
+.alter-moves button:disabled { opacity: .3; cursor: default; }
+.alter-moves button:not(:disabled):hover { background: var(--accent2); color: #1a1430; }
 
 /* fanned face-down hand you pick from for a blind steal */
 .pick-fan { display: flex; justify-content: center; flex-wrap: wrap; margin: 20px 0 8px; padding-left: 16px; }

@@ -19,7 +19,12 @@ function err(message) {
 }
 
 // Cards that, when played, open a Hiss (Nope) window.
-const ACTIONABLE = new Set(['SKIP', 'ATTACK', 'FAVOR', 'SHUFFLE', 'FUTURE']);
+const ACTIONABLE = new Set([
+  'SKIP', 'ATTACK', 'FAVOR', 'SHUFFLE', 'FUTURE',
+  'TARGETED_ATTACK', 'ALTER', 'DRAW_BOTTOM', // Party Pack
+]);
+// Action cards that need the player to pick a target.
+const NEEDS_TARGET = new Set(['FAVOR', 'TARGETED_ATTACK']);
 
 // ------------------------------------------------------------------
 // Playing cards from hand
@@ -42,8 +47,8 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
   const cards = cardIds.map((id) => player.hand.find((c) => c.id === id)).filter(Boolean);
   if (cards.length !== cardIds.length) return err('You do not hold those cards.');
 
-  // ---- Cat combo (all selected cards are the same cat) ----
-  if (cards.every((c) => c.type === 'CAT')) {
+  // ---- Cat combo (all selected cards are cats or wild Feral Cats) ----
+  if (cards.every((c) => c.type === 'CAT' || c.type === 'FERAL')) {
     return this.playCatCombo(player, cards, opts);
   }
 
@@ -56,12 +61,12 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
   if (card.type === 'NOPE') return err('A Nope can only interrupt another action.');
   if (!ACTIONABLE.has(card.type)) return err('That card has no solo action.');
 
-  // FAVOR needs a target.
+  // Some cards need the player to pick a target.
   let target = null;
-  if (card.type === 'FAVOR') {
+  if (NEEDS_TARGET.has(card.type)) {
     target = this.playerById(opts.targetId);
-    if (!target || !target.alive || target.id === player.id) return err('Choose a valid target to beg from.');
-    if (target.hand.length === 0) return err('That player has no cards to give.');
+    if (!target || !target.alive || target.id === player.id) return err('Choose a valid player.');
+    if (card.type === 'FAVOR' && target.hand.length === 0) return err('That player has no cards to give.');
   }
 
   // Move card to discard and open the Nope window.
@@ -85,12 +90,17 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
 };
 
 Game.prototype.playCatCombo = function playCatCombo(player, cards, opts) {
-  const catId = cards[0].cat;
-  if (!cards.every((c) => c.type === 'CAT' && c.cat === catId)) {
-    return err('Cat cards must all match to combo.');
-  }
   if (cards.length !== 2 && cards.length !== 3) {
     return err('Play 2 matching cats (random steal) or 3 (named steal).');
+  }
+  // Feral Cats are wild: the real cats among the combo must all match, but a
+  // Feral can stand in for any of them. (Two Ferals together also form a pair.)
+  const realCats = cards.filter((c) => c.type === 'CAT');
+  if (!cards.every((c) => c.type === 'CAT' || c.type === 'FERAL')) {
+    return err('Only cat cards can be combined.');
+  }
+  if (realCats.length && !realCats.every((c) => c.cat === realCats[0].cat)) {
+    return err('Cat cards must match (Feral Cats are wild).');
   }
 
   const target = this.playerById(opts.targetId);
@@ -108,8 +118,9 @@ Game.prototype.playCatCombo = function playCatCombo(player, cards, opts) {
   }
   this.lastDiscardBy = player.id;
   const mode = cards.length === 2 ? 'random' : 'named';
+  const comboName = (realCats[0] && realCats[0].name) || 'Feral Cat';
   this.logMsg(
-    `${player.name} played ${cards.length} ${cards[0].name} cards on ${target.name}.`
+    `${player.name} played ${cards.length} ${comboName} cards on ${target.name}.`
   );
 
   this.actionSeq = (this.actionSeq || 0) + 1;
@@ -243,10 +254,63 @@ Game.prototype.resolveAction = function resolveAction() {
     case 'STEAL':
       this.resolveSteal(actor, a);
       break;
+    case 'TARGETED_ATTACK': {
+      // Like Attack, but the attacker chose exactly who suffers it.
+      if (this.turnPeeked && topNow) this.suspectTopId = topNow.id;
+      this.turnPeeked = false;
+      const imposed = this.turnsFromAttack ? this.turnsRemaining : 0;
+      const carry = imposed + 2;
+      const ti = this.players.findIndex((pl) => pl.id === a.targetId && pl.alive);
+      if (ti >= 0) this.turnIndex = ti; else this.nextAlive(1);
+      this.turnsRemaining = carry;
+      this.turnsFromAttack = true;
+      this.logMsg(`${this.currentPlayer().name} was targeted — they must take ${carry} turns!`);
+      break;
+    }
+    case 'ALTER':
+      this.turnPeeked = true; // altering also reveals the top to this player
+      this.pending = {
+        kind: 'alter',
+        actorId: p.actorId,
+        viewerId: p.actorId,
+        futureCards: this.deck.slice(-3).reverse(), // top-first
+        endsAt: Date.now() + 25000,
+        description: `${actor.name} is altering the future.`,
+      };
+      break;
+    case 'DRAW_BOTTOM': {
+      // Draw the BOTTOM card to end the turn instead of the top one.
+      const card = this.deck.shift(); // bottom (top of deck is the array's end)
+      if (card) this.resolveDraw(actor, card);
+      break;
+    }
     default:
       break;
   }
   this.checkWin();
+};
+
+// Reorder the top three cards after an Alter the Future. `order` is the new
+// top-first list of the (up to) three card ids the viewer saw.
+Game.prototype.alterFuture = function alterFuture(playerId, order) {
+  if (!this.pending || this.pending.kind !== 'alter') return err('Nothing to alter.');
+  if (this.pending.viewerId !== playerId) return err('Not your alter.');
+  const n = Math.min(3, this.deck.length);
+  const top = this.deck.slice(this.deck.length - n); // array order (bottom..top of the three)
+  if (Array.isArray(order) && order.length === n) {
+    const byId = {};
+    top.forEach((c) => { byId[c.id] = c; });
+    if (order.every((id) => byId[id])) {
+      // order is top-first; the deck's end is the top, so end = order[0].
+      for (let i = 0; i < n; i += 1) this.deck[this.deck.length - 1 - i] = byId[order[i]];
+    }
+  }
+  this.pending = null;
+  return ok();
+};
+
+Game.prototype.alterAuto = function alterAuto() {
+  if (this.pending && this.pending.kind === 'alter') this.pending = null;
 };
 
 Game.prototype.resolveSteal = function resolveSteal(actor, a) {
@@ -373,10 +437,15 @@ Game.prototype.drawCard = function drawCard(playerId) {
   if (this.pending) return err('Resolve the current action first.');
   if (!this.isCurrent(playerId)) return err('It is not your turn.');
   const player = this.playerById(playerId);
-
-  const card = this.deck.pop();
+  const card = this.deck.pop(); // top of the deck is the array's end
   if (!card) return err('The deck is empty.');
-  // this draw consumes the top, so any standing suspicion about it is settled
+  return this.resolveDraw(player, card);
+};
+
+// Apply a freshly-drawn card (from the top or, for Draw From the Bottom, the
+// bottom): explode + reveal, or land it in the hand and pause on it.
+Game.prototype.resolveDraw = function resolveDraw(player, card) {
+  // this draw consumes a card, so any standing suspicion about it is settled
   if (this.suspectTopId === card.id) this.suspectTopId = null;
   if (this.defuseWary > 0) this.defuseWary -= 1; // post-defuse caution fades as cards come off
 
@@ -504,6 +573,12 @@ Game.prototype.describeAction = function describeAction(type, player, target) {
       return `${player.name} is peeking at the top of the deck.`;
     case 'FAVOR':
       return `${player.name} is begging a card from ${target ? target.name : 'someone'}.`;
+    case 'TARGETED_ATTACK':
+      return `${player.name} is targeting ${target ? target.name : 'someone'} with extra turns.`;
+    case 'ALTER':
+      return `${player.name} is rearranging the top of the deck.`;
+    case 'DRAW_BOTTOM':
+      return `${player.name} is drawing from the bottom of the deck.`;
     default:
       return `${player.name} played a card.`;
   }

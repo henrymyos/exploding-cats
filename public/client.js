@@ -195,8 +195,20 @@ function renderLobby(lobby) {
   }
   renderScoreboard($('lobbyScores'), lobby);
   const isHost = lobby.hostId === PLAYER_ID;
+  const mode = lobby.mode || 'original';
+  const maxForMode = mode === 'party' ? 10 : 5;
+  // deck selector: only the host can change it
+  $('modeSelect').querySelectorAll('.mode-opt').forEach((b) => {
+    b.classList.toggle('on', b.dataset.mode === mode);
+    b.disabled = !isHost;
+    b.onclick = isHost ? () => {
+      socket.emit('setMode', { code: state.code, playerId: PLAYER_ID, mode: b.dataset.mode }, (res) => {
+        if (res && !res.ok) toast(res.error, true);
+      });
+    } : null;
+  });
   const enough = lobby.players.length >= 2;
-  const full = lobby.players.length >= 5;
+  const full = lobby.players.length >= maxForMode;
   const botCount = lobby.players.filter((p) => p.isBot).length;
 
   $('botControls').style.display = isHost ? 'flex' : 'none';
@@ -352,53 +364,65 @@ function arrangeOpponentsArc(container) {
   if (!n) { container.style.height = ''; return; }
   const narrow = window.matchMedia('(max-width: 480px)').matches;
   const short = window.innerHeight < 700;            // little vertical room — keep the arc shallow
-  const TILT = 8;                                   // max outward tilt (deg) — gentle, less side bleed
-  const RY = short ? (narrow ? 44 : 58) : (narrow ? 72 : 94); // arc depth (px) — deeper seats separate vertically
-  const BASE_TOP = short ? 3 : (narrow ? 6 : 10);    // push the whole arc down a touch
-  const spanDeg = n > 1 ? Math.min(26 * n, 130) : 0;
-  const halfAng = (spanDeg / 2) * Math.PI / 180;
-  const sinHalf = Math.sin(halfAng) || 1;
+  const TILT = 8;                                    // max outward tilt (deg)
+  const BASE_TOP = short ? 3 : (narrow ? 6 : 10);
+  // 6+ opponents (only possible in Party Pack) split across two stacked arcs so
+  // they don't have to shrink into nothing on a phone.
+  const rowsN = n >= 6 ? 2 : 1;
+
+  // Position one row of seats on its own downward arc starting at baseTop;
+  // returns the lowest tile bottom so the container can be sized.
+  const arrangeRow = (els, baseTop, tileW, tileH, cw) => {
+    const m = els.length;
+    const RYbase = short ? (narrow ? 44 : 58) : (narrow ? 72 : 94);
+    const RY = rowsN === 2 ? RYbase * 0.6 : RYbase;  // shallower arcs when stacked
+    const spanDeg = m > 1 ? Math.min(26 * m, 130) : 0;
+    const sinHalf = Math.sin((spanDeg / 2) * Math.PI / 180) || 1;
+    const tiltR = TILT * Math.PI / 180;
+    const halfExtent = (tileW / 2) * Math.cos(tiltR) + (tileH / 2) * Math.sin(tiltR);
+    const maxOffset = Math.max(0, cw / 2 - halfExtent - 6);
+    const sx = els.map((_, i) => {
+      const f = m > 1 ? (i / (m - 1) - 0.5) : 0;
+      return Math.sin(f * spanDeg * Math.PI / 180) / sinHalf;
+    });
+    let minGap = Infinity;
+    for (let i = 1; i < sx.length; i += 1) minGap = Math.min(minGap, sx[i] - sx[i - 1]);
+    const needed = (m > 1 && minGap > 0) ? (tileW + 6) / minGap : 0;
+    const desired = cw * Math.min(narrow ? 0.42 : 0.40, 0.12 * m);
+    const edgeOffset = Math.min(maxOffset, Math.max(desired, needed));
+    let bottom = 0;
+    els.forEach((el, i) => {
+      const f = m > 1 ? (i / (m - 1) - 0.5) : 0;
+      const ang = f * spanDeg * Math.PI / 180;
+      const xpx = cw / 2 + edgeOffset * sx[i];
+      const y = baseTop + RY * (1 - Math.cos(ang));
+      const rot = f * TILT * 2;
+      if (el.dataset.fresh) el.style.transition = 'none';
+      el.style.left = xpx.toFixed(1) + 'px';
+      el.style.top = y.toFixed(1) + 'px';
+      el.style.transform = `translateX(-50%) rotate(${rot.toFixed(1)}deg)`;
+      el.style.zIndex = el.classList.contains('active') ? '20' : String(Math.round(10 - Math.abs(f) * 8));
+      bottom = Math.max(bottom, y + tileH);
+    });
+    return bottom;
+  };
 
   const layout = () => {
     let tileW = 0, tileH = 0;
     opps.forEach((el) => { tileW = Math.max(tileW, el.offsetWidth); tileH = Math.max(tileH, el.offsetHeight); });
     if (!tileW) { tileW = narrow ? 70 : 96; tileH = narrow ? 78 : 90; }   // fallback while hidden
     const cw = container.clientWidth || container.getBoundingClientRect().width || window.innerWidth;
-    // widest horizontal reach of a tilted tile from its centre, so it stays on screen
-    const tiltR = TILT * Math.PI / 180;
-    const halfExtent = (tileW / 2) * Math.cos(tiltR) + (tileH / 2) * Math.sin(tiltR);
-    const maxOffset = Math.max(0, cw / 2 - halfExtent - 6);     // px the edge seat may sit from centre
-    // normalised horizontal position (-1..1) of each seat along the arc
-    const sx = opps.map((_, i) => {
-      const f = n > 1 ? (i / (n - 1) - 0.5) : 0;
-      return Math.sin(f * spanDeg * Math.PI / 180) / sinHalf;
-    });
-    // spread the seats just wide enough that tiles (+ a little air) never overlap,
-    // based on the tightest adjacent gap, but never past the screen edge.
-    let minGap = Infinity;
-    for (let i = 1; i < sx.length; i += 1) minGap = Math.min(minGap, sx[i] - sx[i - 1]);
-    const needed = (n > 1 && minGap > 0) ? (tileW + 6) / minGap : 0;
-    // spread scales with the count: a few seats stay nearer the centre (not
-    // shoved to the edges), more seats fan out toward the sides. Never tighter
-    // than the no-overlap minimum, never past the screen edge.
-    const desired = cw * Math.min(narrow ? 0.42 : 0.40, 0.12 * n);
-    const edgeOffset = Math.min(maxOffset, Math.max(desired, needed));
-    let maxY = 0;
-    opps.forEach((el, i) => {
-      const f = n > 1 ? (i / (n - 1) - 0.5) : 0;     // -0.5 (left) .. 0.5 (right)
-      const ang = f * spanDeg * Math.PI / 180;
-      const xpx = cw / 2 + edgeOffset * sx[i];
-      const y = BASE_TOP + RY * (1 - Math.cos(ang));
-      const rot = f * TILT * 2;                       // -TILT .. +TILT across the row
-      // a brand-new seat must not animate in from the top-centre default
-      if (el.dataset.fresh) el.style.transition = 'none';
-      el.style.left = xpx.toFixed(1) + 'px';
-      el.style.top = y.toFixed(1) + 'px';
-      el.style.transform = `translateX(-50%) rotate(${rot.toFixed(1)}deg)`;
-      el.style.zIndex = el.classList.contains('active') ? '20' : String(Math.round(10 - Math.abs(f) * 8));
-      if (y > maxY) maxY = y;
-    });
-    container.style.height = (maxY + tileH + 4) + 'px';
+    let bottom;
+    if (rowsN === 2) {
+      const half = Math.ceil(n / 2);
+      const back = opps.slice(0, half);   // back row sits higher
+      const front = opps.slice(half);     // front row sits lower, clear of the back row
+      const backBottom = arrangeRow(back, BASE_TOP, tileW, tileH, cw);
+      bottom = arrangeRow(front, backBottom + 4, tileW, tileH, cw);
+    } else {
+      bottom = arrangeRow(opps, BASE_TOP, tileW, tileH, cw);
+    }
+    container.style.height = (bottom + 4) + 'px';
   };
   // renderGame can run while #game is still display:none (offsets read 0), so lay
   // out once with the fallback, then correct on the next frame when it's visible.
@@ -749,24 +773,32 @@ function giveCard(cardId) {
   });
 }
 
-// Tapping a stack cycles through the playable selection sizes for that card,
-// then back to none. Cats jump straight to 2 (a pair) since a single cat can't
-// be played: have 2 -> 2 -> 0; have 3+ -> 2 -> 3 -> 0. Others: 1 -> 0.
+// Tapping a stack cycles how many of it are selected. Cat-like cards (cats and
+// wild Feral Cats) accumulate ACROSS stacks so you can combo e.g. a Max + a
+// Feral; other action cards single-select on their own.
+function isCatLike(card) { return card && (card.type === 'CAT' || card.type === 'FERAL'); }
+
 function cycleGroup(grp, g, me) {
   if (!(g.turnPlayerId === PLAYER_ID) || g.pending) return;
   const k = grp.cards.filter((c) => selected.has(c.id)).length;
-  let steps;
-  if (grp.isCat) {
-    steps = [];
-    if (grp.cards.length >= 2) steps.push(2);
-    if (grp.cards.length >= 3) steps.push(3);
-    if (steps.length === 0) steps.push(1); // lone cat: select it to show "need a pair"
+  const catLike = grp.isCat || grp.type === 'FERAL';
+  if (catLike) {
+    // cycle this stack 0 -> 1 -> 2 -> 3 (capped by what you hold), keeping any
+    // other cat-like cards already chosen.
+    const maxN = Math.min(grp.cards.length, 3);
+    const steps = [];
+    for (let i = 1; i <= maxN; i += 1) steps.push(i);
     steps.push(0);
+    const newK = steps[(steps.indexOf(k) + 1) % steps.length];
+    const others = [...selected].filter((id) => {
+      const c = me.hand.find((x) => x.id === id);
+      return isCatLike(c) && !grp.cards.some((gc) => gc.id === id);
+    });
+    selected = new Set([...others, ...grp.cards.slice(0, newK).map((c) => c.id)]);
   } else {
-    steps = [1, 0];
+    // single action card: just this one, on or off
+    selected = new Set(k ? [] : [grp.cards[0].id]);
   }
-  const newK = steps[(steps.indexOf(k) + 1) % steps.length];
-  selected = new Set(grp.cards.slice(0, newK).map((c) => c.id));
   renderHand(g, me, g.turnPlayerId === PLAYER_ID);
 }
 
@@ -781,13 +813,16 @@ function renderHandActions(g, me, isMyTurn) {
   if (!isMyTurn || g.pending) return;
   if (sel.length === 0) return;
 
-  const allCat = sel.every((c) => c.type === 'CAT');
-  if (allCat && sel.length >= 2) {
-    const sameCat = sel.every((c) => c.cat === sel[0].cat);
-    if (!sameCat) { addActionLabel(bar, 'Select matching cats to combo'); return; }
-    if (sel.length === 2) addActionBtn(bar, 'Steal random card', () => promptTarget(me, g, sel, null));
-    else if (sel.length === 3) addActionBtn(bar, 'Demand a card', () => promptNamed(me, g, sel));
-    else addActionLabel(bar, 'Use 2 or 3 matching cats');
+  // Cat combo (cats + wild Feral Cats). Real cats must match; Ferals are wild.
+  const allCatLike = sel.every((c) => c.type === 'CAT' || c.type === 'FERAL');
+  if (allCatLike && (sel.length >= 2 || (sel.length === 1 && sel[0].type === 'FERAL'))) {
+    const reals = sel.filter((c) => c.type === 'CAT');
+    const sameCat = reals.every((c) => c.cat === reals[0].cat);
+    if (sel.length < 2) { addActionLabel(bar, 'Need a pair (Feral is wild)'); return; }
+    if (sel.length > 3) { addActionLabel(bar, 'Use 2 or 3 cards'); return; }
+    if (!sameCat) { addActionLabel(bar, 'Cats must match (Feral is wild)'); return; }
+    if (sel.length === 2) addActionBtn(bar, 'Steal random card', () => promptTarget(me, g, sel, 'steal'));
+    else addActionBtn(bar, 'Demand a card', () => promptNamed(me, g, sel));
     return;
   }
 
@@ -799,6 +834,7 @@ function renderHandActions(g, me, isMyTurn) {
     }
     const label = `Play ${c.name}`;
     if (c.type === 'FAVOR') addActionBtn(bar, label, () => promptTarget(me, g, sel, 'favor'));
+    else if (c.type === 'TARGETED_ATTACK') addActionBtn(bar, label, () => promptTarget(me, g, sel, 'attack'));
     else addActionBtn(bar, label, () => doPlay(sel.map((x) => x.id)));
     return;
   }
@@ -835,17 +871,21 @@ $('drawPile').onclick = () => {
 };
 
 /* ---------------- target / named pickers ---------------- */
-function aliveOpponents(g) {
-  return g.players.filter((p) => p.alive && p.id !== PLAYER_ID && p.handCount > 0);
+// For steal/favor we need a player who holds cards; a Targeted Attack can hit
+// anyone still alive.
+function aliveOpponents(g, anyAlive) {
+  return g.players.filter((p) => p.alive && p.id !== PLAYER_ID && (anyAlive || p.handCount > 0));
 }
 
 function promptTarget(me, g, sel, mode) {
-  const opps = aliveOpponents(g);
+  const opps = aliveOpponents(g, mode === 'attack');
   if (opps.length === 0) return toast('No one to target.', true);
-  // only one other player — no need to ask, just take from them
+  // only one other player — no need to ask
   if (opps.length === 1) { doPlay(sel.map((c) => c.id), { targetId: opps[0].id }); return; }
+  const title = mode === 'favor' ? 'Ask a favor from whom?'
+    : mode === 'attack' ? 'Attack whom?' : 'Steal from whom?';
   openOverlay(`
-    <h2>${mode === 'favor' ? 'Ask a favor from whom?' : 'Steal from whom?'}</h2>
+    <h2>${title}</h2>
     <div class="choice-grid">
       ${opps.map((p) => `<button class="choice" data-id="${p.id}"><span class="choice-avatar">😺</span><span class="choice-name">${escapeHtml(p.name)}</span><span class="choice-sub">${p.handCount} cards</span></button>`).join('')}
     </div>
@@ -927,6 +967,13 @@ function renderPending(g, me) {
     showFuture(p.futureCards);
   } else if (p._overlay !== 'future') {
     if (overlayMode === 'future') closeOverlay();
+  }
+
+  // Alter the Future: the viewer reorders the top three cards.
+  if (p.kind === 'alter' && p.youAlter && p.futureCards) {
+    showAlter(p.futureCards);
+  } else if (overlayMode === 'alter') {
+    closeOverlay();
   }
 
   // Favor: I must give a card — prompt in place; the hand lights up to be tapped.
@@ -1053,6 +1100,37 @@ function showFuture(cards) {
     socket.emit('dismissFuture', { code: state.code, playerId: PLAYER_ID }, () => {});
     closeOverlay();
   };
+}
+
+// Alter the Future: reorder the top three cards (left = next to be drawn).
+function showAlter(cards) {
+  if (overlayMode === 'alter') return; // already open — keep the in-progress order
+  overlayMode = 'alter';
+  let order = cards.slice(); // top-first
+  const render = () => {
+    openOverlay(`
+      <h2>🔀 Alter the Future</h2>
+      <p class="hint">Reorder the top of the deck (left = next draw). Use ◀ ▶ to move cards, then Done.</p>
+      <div class="future-row">
+        ${order.map((c, i) => `<div class="alter-card"><div class="card" data-type="${c.type}">${cardFace(c)}</div><div class="label">${i === 0 ? 'next' : '#' + (i + 1)}</div><div class="alter-moves"><button data-mv="l" data-i="${i}"${i === 0 ? ' disabled' : ''}>◀</button><button data-mv="r" data-i="${i}"${i === order.length - 1 ? ' disabled' : ''}>▶</button></div></div>`).join('')}
+      </div>
+      <button class="btn primary" id="alterDone">Done</button>
+    `, true);
+    $('overlayBox').querySelectorAll('[data-mv]').forEach((b) => {
+      b.onclick = () => {
+        const i = +b.dataset.i;
+        const j = b.dataset.mv === 'l' ? i - 1 : i + 1;
+        if (j < 0 || j >= order.length) return;
+        [order[i], order[j]] = [order[j], order[i]];
+        render();
+      };
+    });
+    $('alterDone').onclick = () => {
+      socket.emit('alterFuture', { code: state.code, playerId: PLAYER_ID, order: order.map((c) => c.id) }, () => {});
+      closeOverlay();
+    };
+  };
+  render();
 }
 
 function showFavorGive(me) {
@@ -1206,6 +1284,11 @@ const GLYPHS = {
   FAVOR: '<svg viewBox="0 0 64 64"><path d="M32 56 C7 38 8 17 23 17 C31 17 32 26 32 26 C32 26 33 17 41 17 C56 17 57 38 32 56 Z"/></svg>',
   SHUFFLE: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M10 20 H42 M34 12 l8 8 l-8 8"/><path d="M54 44 H22 M30 36 l-8 8 l8 8"/></svg>',
   FUTURE: '<svg viewBox="0 0 64 64"><path d="M6 32 C18 13 46 13 58 32 C46 51 18 51 6 32 Z" fill="none" stroke="#fff" stroke-width="6"/><circle cx="32" cy="32" r="9"/></svg>',
+  // ---- Party Pack ----
+  TARGETED_ATTACK: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="5"><circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="11"/><path d="M32 4v10 M32 50v10 M4 32h10 M50 32h10" stroke-linecap="round"/></svg>',
+  ALTER: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 22h28 M34 14l8 8-8 8"/><path d="M50 42H22 M30 34l-8 8 8 8"/></svg>',
+  DRAW_BOTTOM: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8v36 M18 30l14 14 14-14"/><path d="M12 54h40"/></svg>',
+  FERAL: '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/><path d="M44 6l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/></svg>',
 };
 
 const PAW_SVG = '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/></svg>';
@@ -1304,6 +1387,10 @@ const ACTION_PHOTOS = {
   FAVOR:    ['max3.png', 'max4.png'],
   SHUFFLE:  ['pepper3.png', 'gambit3.png'],
   FUTURE:   ['loki3.png', 'genevieve3.png'],
+  // Party Pack types reuse photos thematically (attack-like, future-like, ...).
+  TARGETED_ATTACK: ['loki.png', 'loki2.png'],
+  ALTER:           ['loki3.png', 'genevieve3.png'],
+  DRAW_BOTTOM:     ['pepper3.png', 'gambit3.png'],
 };
 
 function photoFor(card) {
@@ -1320,9 +1407,10 @@ function photoFor(card) {
 
 function cardFace(card) {
   const isCat = card.type === 'CAT';
+  const isFeral = card.type === 'FERAL';
   const badge = isCat
     ? `<span class="corner-badge paw">${PAW_SVG}</span>`
-    : `<span class="corner-badge glyph">${GLYPHS[card.type] || ''}</span>`;
+    : `<span class="corner-badge ${isFeral ? 'paw' : 'glyph'}">${isFeral ? GLYPHS.FERAL : (GLYPHS[card.type] || '')}</span>`;
   return (
     `<div class="card-art photo" data-type="${card.type}" style="background-image:url('${photoFor(card)}')">${badge}</div>` +
     `<div class="card-name">${escapeHtml(card.name)}</div>`

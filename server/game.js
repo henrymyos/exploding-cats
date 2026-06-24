@@ -1,6 +1,6 @@
 'use strict';
 
-const { ACTION_CARDS, CAT_CARD_COUNT, catList } = require('./cards');
+const { CARD_DEFS, MODES, modeConfig, catList } = require('./cards');
 
 let cardSeq = 0;
 function makeCard(props) {
@@ -22,8 +22,10 @@ function shuffle(arr) {
  * The server is the single source of truth; clients only render snapshots.
  */
 class Game {
-  constructor(playerList) {
-    // playerList: [{ id, name, isBot? }]
+  constructor(playerList, mode) {
+    // playerList: [{ id, name, isBot? }]; mode: 'original' | 'party'
+    this.mode = MODES[mode] ? mode : 'original';
+    this.cfg = modeConfig(this.mode);
     this.players = playerList.map((p) => ({
       id: p.id,
       name: p.name,
@@ -59,22 +61,27 @@ class Game {
 
   buildBaseDeck() {
     const cards = [];
+    const cfg = this.cfg;
 
-    // Action cards (everything except Exploding Cats and Catnip/Defuse, which are handled specially).
-    for (const key of ['NOPE', 'ATTACK', 'SKIP', 'FAVOR', 'SHUFFLE', 'FUTURE']) {
-      const def = ACTION_CARDS[key];
-      for (let i = 0; i < def.count; i += 1) {
+    // Action cards (Exploding Kittens and Defuse are seeded separately in deal()).
+    for (const key of Object.keys(cfg.actions)) {
+      const def = CARD_DEFS[key];
+      for (let i = 0; i < cfg.actions[key]; i += 1) {
         cards.push(makeCard({ type: def.type, name: def.name, blurb: def.blurb }));
       }
     }
 
     // Collectible cat cards (no standalone power; played as pairs/trios).
     for (const cat of catList()) {
-      for (let i = 0; i < CAT_CARD_COUNT; i += 1) {
-        cards.push(
-          makeCard({ type: 'CAT', cat: cat.id, name: cat.name, blurb: cat.blurb })
-        );
+      for (let i = 0; i < cfg.catCount; i += 1) {
+        cards.push(makeCard({ type: 'CAT', cat: cat.id, name: cat.name, blurb: cat.blurb }));
       }
+    }
+
+    // Feral Cats: wild cards usable as any cat in a combo (Party Pack).
+    for (let i = 0; i < (cfg.feral || 0); i += 1) {
+      const def = CARD_DEFS.FERAL;
+      cards.push(makeCard({ type: def.type, name: def.name, blurb: def.blurb }));
     }
 
     return cards;
@@ -86,9 +93,9 @@ class Game {
 
     // Pull Defuse cards out of the supply; deal/sprinkle them per the rules.
     const defusePool = [];
-    for (let i = 0; i < ACTION_CARDS.DEFUSE.count; i += 1) {
+    for (let i = 0; i < this.cfg.defuse; i += 1) {
       defusePool.push(
-        makeCard({ type: 'DEFUSE', name: ACTION_CARDS.DEFUSE.name, blurb: ACTION_CARDS.DEFUSE.blurb })
+        makeCard({ type: 'DEFUSE', name: CARD_DEFS.DEFUSE.name, blurb: CARD_DEFS.DEFUSE.blurb })
       );
     }
 
@@ -103,10 +110,12 @@ class Game {
     // Remaining defuses go back into the deck.
     while (defusePool.length) deck.push(defusePool.pop());
 
-    // Insert (players - 1) Exploding Cats so exactly one player can survive.
-    for (let i = 0; i < n - 1; i += 1) {
+    // Insert (players - 1) Exploding Cats so exactly one player can survive,
+    // capped by how many the box actually ships.
+    const kittens = Math.min(n - 1, this.cfg.explodePool);
+    for (let i = 0; i < kittens; i += 1) {
       deck.push(
-        makeCard({ type: 'EXPLODE', name: ACTION_CARDS.EXPLODE.name, blurb: ACTION_CARDS.EXPLODE.blurb })
+        makeCard({ type: 'EXPLODE', name: CARD_DEFS.EXPLODE.name, blurb: CARD_DEFS.EXPLODE.blurb })
       );
     }
 
@@ -185,6 +194,7 @@ class Game {
     const me = this.playerById(playerId);
     return {
       phase: this.phase,
+      mode: this.mode,
       winnerId: this.winnerId,
       deckCount: this.deck.length,
       discardTop: this.discard.length ? this.discard[this.discard.length - 1] : null,
@@ -238,6 +248,10 @@ class Game {
     // Private reveals: only the relevant player sees the secret payload.
     if (p.kind === 'future' && p.viewerId === playerId) {
       base.futureCards = p.futureCards;
+    }
+    if (p.kind === 'alter' && p.viewerId === playerId) {
+      base.futureCards = p.futureCards; // top-first; this player gets to reorder them
+      base.youAlter = true;
     }
     if (p.kind === 'favorPick' && p.targetId === playerId) {
       base.youMustGive = true;

@@ -29,16 +29,21 @@ function richest(targets) {
   return targets.slice().sort((a, b) => b.hand.length - a.hand.length)[0];
 }
 
-// Find two matching cat cards in hand; returns [id, id] or null.
+// Find two cards that form a steal pair; returns [id, id] or null.
+// Feral Cats are wild (Party Pack): cat+feral or feral+feral also pair up.
 function findCatPair(hand) {
   const byCat = {};
+  const ferals = [];
   for (const c of hand) {
-    if (c.type !== 'CAT') continue;
-    (byCat[c.cat] = byCat[c.cat] || []).push(c.id);
+    if (c.type === 'FERAL') ferals.push(c.id);
+    else if (c.type === 'CAT') (byCat[c.cat] = byCat[c.cat] || []).push(c.id);
   }
   for (const cat of Object.keys(byCat)) {
     if (byCat[cat].length >= 2) return byCat[cat].slice(0, 2);
   }
+  const anyCat = Object.values(byCat).find((ids) => ids.length);
+  if (ferals.length && anyCat) return [anyCat[0], ferals[0]]; // real cat + wild
+  if (ferals.length >= 2) return [ferals[0], ferals[1]];      // two wilds
   return null;
 }
 
@@ -53,6 +58,11 @@ function chooseTurnAction(game, bot) {
   const favor = has('FAVOR');
   const shuffle = has('SHUFFLE');
   const hasDefuse = !!has('DEFUSE');
+  // Party Pack cards
+  const targetedAttack = has('TARGETED_ATTACK');
+  const alter = has('ALTER');
+  const drawBottom = has('DRAW_BOTTOM');
+  const peeker = future || alter; // either card lets us look at the top of the deck
 
   const top = game.deck[game.deck.length - 1];
   // Memory now holds every card seen in the last peek, so after drawing one the
@@ -72,10 +82,19 @@ function chooseTurnAction(game, bot) {
   const wary = game.defuseWary || 0;
   const risk = Math.min(1, explodeRisk(game) + 0.11 * wary);
 
-  // A way to avoid drawing the current top, best option first.
-  const dodge = () => {
+  const targets = aliveTargets(game, bot);
+  const targetAttackOn = () => {
+    const t = richest(targets);
+    return t ? { kind: 'play', cardIds: [targetedAttack.id], opts: { targetId: t.id } } : null;
+  };
+
+  // A way to avoid drawing the current top, best option first. bottomOk allows a
+  // Draw From the Bottom — only useful when it's the TOP specifically that's bad.
+  const dodge = (bottomOk) => {
     if (skip) return play(skip);
     if (attack) return play(attack);
+    if (targetedAttack && targets.length) return targetAttackOn();
+    if (bottomOk && drawBottom) return play(drawBottom); // sidestep a known-bad top
     if (shuffle) return play(shuffle); // scramble the bad top out of the way
     return null;
   };
@@ -83,19 +102,17 @@ function chooseTurnAction(game, bot) {
   // 1. The next card is (or is very likely) an Exploding Cat — don't draw into it.
   //    Dodge even if we hold a Defuse, to save the Defuse for a surprise later.
   if (knownExplodeTop || suspectTop) {
-    const d = dodge();
+    const d = dodge(true);
     if (d) return d;
     // Can't dodge. If we only *suspect* (no certainty) and can peek, confirm first.
-    if (suspectTop && !knownExplodeTop && future) return play(future);
+    if (suspectTop && !knownExplodeTop && peeker) return play(peeker);
     // Otherwise we draw: survive on a Defuse, or it's a forced loss.
   }
 
-  // 2. Peek when we don't already know the top and a draw looks risky.
-  if (!knownType && !suspectTop && future && (risk > 0.18 || rnd() < 0.22)) {
-    return play(future);
+  // 2. Peek (or alter) when we don't already know the top and a draw looks risky.
+  if (!knownType && !suspectTop && peeker && (risk > 0.18 || rnd() < 0.22)) {
+    return play(peeker);
   }
-
-  const targets = aliveTargets(game, bot);
 
   // 3. Cash in a matching cat pair to steal.
   const pair = findCatPair(hand);

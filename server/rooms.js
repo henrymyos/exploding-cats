@@ -2,14 +2,19 @@
 
 const { Game } = require('./game');
 const brain = require('./botBrain');
-const { catList } = require('./cards');
+const { catList, modeConfig } = require('./cards');
 require('./actions'); // augments Game.prototype
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
-const MAX_PLAYERS = 5;
 const MIN_PLAYERS = 2;
 
-const BOT_NAMES = ['Whiskers Bot', 'Mittens Bot', 'Felix Bot', 'Smokey Bot', 'Tiger Bot'];
+// Max seats depend on the chosen deck (Original = 5, Party Pack = 10).
+function maxPlayers(room) {
+  return modeConfig(room && room.mode).maxPlayers;
+}
+
+const BOT_NAMES = ['Whiskers Bot', 'Mittens Bot', 'Felix Bot', 'Smokey Bot', 'Tiger Bot',
+  'Luna Bot', 'Oreo Bot', 'Shadow Bot', 'Ziggy Bot'];
 const CAT_IDS = catList().map((c) => c.id);
 const REACTION_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];
 
@@ -43,12 +48,13 @@ class RoomManager {
     this.broadcast = broadcast; // (code) => void  (server re-sends snapshots)
   }
 
-  createRoom(hostName, hostId, avatar) {
+  createRoom(hostName, hostId, avatar, mode) {
     let code = randomCode();
     while (this.rooms.has(code)) code = randomCode();
     const room = {
       code,
       hostId,
+      mode: mode === 'party' ? 'party' : 'original',
       players: [{ id: hostId, name: hostName, connected: true, avatar: cleanAvatar(avatar) }],
       game: null,
       timer: null,
@@ -59,6 +65,20 @@ class RoomManager {
     };
     this.rooms.set(code, room);
     return room;
+  }
+
+  // Host switches the deck (Original / Party Pack) while still in the lobby.
+  setMode(code, playerId, mode) {
+    const room = this.getRoom(code);
+    if (!room) return { error: 'No room with that code.' };
+    if (room.hostId !== playerId) return { error: 'Only the host can change the deck.' };
+    if (room.game) return { error: 'Cannot change the deck mid-game.' };
+    const next = mode === 'party' ? 'party' : 'original';
+    if (room.players.length > modeConfig(next).maxPlayers) {
+      return { error: `Too many players for ${modeConfig(next).label}.` };
+    }
+    room.mode = next;
+    return { room };
   }
 
   getRoom(code) {
@@ -81,7 +101,7 @@ class RoomManager {
       return { room };
     }
     if (room.game) return { error: 'That game has already started.' };
-    if (room.players.length >= MAX_PLAYERS) return { error: 'Room is full (max 5).' };
+    if (room.players.length >= maxPlayers(room)) return { error: `Room is full (max ${maxPlayers(room)}).` };
     room.players.push({ id: playerId, name, connected: true, avatar: cleanAvatar(avatar) });
     return { room };
   }
@@ -142,7 +162,7 @@ class RoomManager {
     if (!room.players.find((p) => p.id === room.hostId)) room.hostId = room.players[0].id;
     if (room.timer) { clearTimeout(room.timer); room.timer = null; }
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
-    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
+    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode);
     this.scheduleResolve(room);
     this.scheduleBots(room);
     return { room };
@@ -160,7 +180,7 @@ class RoomManager {
     if (!room) return { error: 'Room not found.' };
     if (room.hostId !== playerId) return { error: 'Only the host can add bots.' };
     if (room.game) return { error: 'Game already started.' };
-    if (room.players.length >= MAX_PLAYERS) return { error: 'Room is full (max 5).' };
+    if (room.players.length >= maxPlayers(room)) return { error: `Room is full (max ${maxPlayers(room)}).` };
     const used = new Set(room.players.map((p) => p.name));
     const name = BOT_NAMES.find((n) => !used.has(n)) || `Bot ${room.players.length}`;
     const id = `bot_${randomCode()}${room.players.length}`;
@@ -189,7 +209,7 @@ class RoomManager {
     if (room.hostId !== playerId) return { error: 'Only the host can start the game.' };
     if (room.game) return { error: 'Game already started.' };
     if (room.players.length < MIN_PLAYERS) return { error: 'Need at least 2 players.' };
-    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })));
+    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode);
     this.scheduleResolve(room);
     this.scheduleBots(room);
     return { room };
@@ -224,6 +244,7 @@ class RoomManager {
     else if (kind === 'drawn') game.continueTurnAuto();
     else if (kind === 'explode') game.applyExplode();
     else if (kind === 'stealPick') game.stealAuto();
+    else if (kind === 'alter') game.alterAuto();
     // A resolution can open a NEW pending (e.g. action -> favorPick); chain it.
     this.scheduleResolve(room);
     this.recordResultIfFinished(room);
@@ -323,6 +344,10 @@ class RoomManager {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'future', p.viewerId), rand(900, 1600));
       return;
     }
+    if (p && p.kind === 'alter' && this.isBot(g, p.viewerId)) {
+      room.botTimer = setTimeout(() => this.runBotJob(room, 'alter', p.viewerId), rand(900, 1600));
+      return;
+    }
     if (p && p.kind === 'drawn' && this.isBot(g, p.actorId)) {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'continue', p.actorId), rand(500, 1000));
       return;
@@ -377,6 +402,18 @@ class RoomManager {
         };
         g.dismissFuture(botId);
       }
+    } else if (type === 'alter') {
+      if (p && p.kind === 'alter' && p.viewerId === botId) {
+        const top3 = g.deck.slice(-3).reverse(); // top-first
+        // Push any Exploding Kitten to the back of the three (away from the top).
+        const order = top3.slice().sort((a, b) =>
+          (a.type === 'EXPLODE' ? 1 : 0) - (b.type === 'EXPLODE' ? 1 : 0));
+        g.botMemory[botId] = {
+          known: order.map((c) => ({ id: c.id, type: c.type })),
+          shuffleSeq: g.shuffleSeq || 0,
+        };
+        g.alterFuture(botId, order.map((c) => c.id));
+      }
     } else if (type === 'continue') {
       if (p && p.kind === 'drawn' && p.actorId === botId) g.continueTurn(botId);
     } else if (type === 'explode') {
@@ -399,4 +436,4 @@ class RoomManager {
   }
 }
 
-module.exports = { RoomManager, MAX_PLAYERS, MIN_PLAYERS };
+module.exports = { RoomManager, MIN_PLAYERS };

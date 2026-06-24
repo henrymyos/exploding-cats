@@ -34,6 +34,7 @@ function broadcast(code) {
     code: room.code,
     hostId: room.hostId,
     started: !!room.game,
+    mode: room.mode || 'original',
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, isBot: !!p.isBot, avatar: p.avatar || null })),
     scores: manager.scoreboard(room),
     streak: room.streak || null,
@@ -65,13 +66,20 @@ function ackOk(cb, data = {}) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', ({ name, playerId, avatar }, cb) => {
+  socket.on('createRoom', ({ name, playerId, avatar, mode }, cb) => {
     if (!name || !playerId) return ackErr(cb, 'Missing name.');
-    const room = manager.createRoom(name.trim().slice(0, 16), playerId, avatar);
+    const room = manager.createRoom(name.trim().slice(0, 16), playerId, avatar, mode);
     socketIndex.set(socket.id, { code: room.code, playerId });
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
+  });
+
+  socket.on('setMode', ({ code, playerId, mode }, cb) => {
+    const { error } = manager.setMode(code, playerId, mode);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
   });
 
   socket.on('joinRoom', ({ code, name, playerId, avatar }, cb) => {
@@ -159,6 +167,10 @@ io.on('connection', (socket) => {
 
   socket.on('dismissFuture', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.dismissFuture(playerId), cb);
+  });
+
+  socket.on('alterFuture', ({ code, playerId, order }, cb) => {
+    withGame(code, (g) => g.alterFuture(playerId, order), cb);
   });
 
   socket.on('leaveGame', ({ code, playerId }, cb) => {
