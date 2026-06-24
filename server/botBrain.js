@@ -64,9 +64,10 @@ function findCatTrio(hand) {
   return null;
 }
 
-// A live opponent publicly known to be holding a kitten via a Streaking Kitten.
+// A live opponent publicly known to be holding a kitten via a Streaking Kitten
+// (whenever someone streaks it's announced, so this is fair information).
 function streakingTarget(game, bot) {
-  return game.players.find((p) => p.alive && p.id !== bot.id && p.streaking);
+  return game.players.find((p) => p.alive && p.id !== bot.id && p.hand.some((c) => c.type === 'EXPLODE'));
 }
 
 // What the bot wants to do on its own turn — one action per call.
