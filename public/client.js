@@ -290,6 +290,9 @@ function renderGame(g, lobby) {
     keepIds.add(p.id);
   });
   prevOpp.forEach((el, id) => { if (!keepIds.has(id)) el.remove(); });
+  // fewer opponents -> bigger seat tiles (CSS keys off this), so 2 players don't
+  // shrink into the corners.
+  opp.dataset.count = String(opponents.length);
   // Only re-lay-out the arc when the set of seats actually changes (a player
   // joins/leaves). Re-arranging on every render made tiles slide a few px each
   // time a card count changed the tile width. (resize re-arranges separately.)
@@ -375,9 +378,10 @@ function arrangeOpponentsArc(container) {
     let minGap = Infinity;
     for (let i = 1; i < sx.length; i += 1) minGap = Math.min(minGap, sx[i] - sx[i - 1]);
     const needed = (n > 1 && minGap > 0) ? (tileW + 6) / minGap : 0;
-    // spread toward the screen edges (leaving only a small margin) so the seats
-    // aren't bunched in the middle, but never tighter than the no-overlap minimum.
-    const desired = cw * (narrow ? 0.42 : 0.40);
+    // spread scales with the count: a few seats stay nearer the centre (not
+    // shoved to the edges), more seats fan out toward the sides. Never tighter
+    // than the no-overlap minimum, never past the screen edge.
+    const desired = cw * Math.min(narrow ? 0.42 : 0.40, 0.12 * n);
     const edgeOffset = Math.min(maxOffset, Math.max(desired, needed));
     let maxY = 0;
     opps.forEach((el, i) => {

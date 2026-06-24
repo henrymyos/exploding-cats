@@ -168,6 +168,31 @@ h1 { font-size: 2rem; margin: 0; }
 .opp.active .opp-avatar { border-color: var(--accent2); }
 .opp.dead .opp-head .opp-avatar::after { content: "💀"; position: absolute; }
 
+/* Seat tiles scale with how many opponents there are, so a 1-2 player table uses
+   bigger boxes instead of tiny ones hugging the screen edges. (count="4" keeps
+   the compact base size.) */
+.opponents[data-count="1"] .opp,
+.opponents[data-count="2"] .opp { padding: 9px 13px 7px; }
+.opponents[data-count="1"] .opp-head,
+.opponents[data-count="2"] .opp-head { flex-direction: column; gap: 3px; }
+.opponents[data-count="1"] .opp .opp-name,
+.opponents[data-count="2"] .opp .opp-name { max-width: 104px; font-size: .9rem; }
+.opponents[data-count="1"] .opp .opp-avatar,
+.opponents[data-count="2"] .opp .opp-avatar { width: 42px; height: 42px; }
+.opponents[data-count="1"] .opp-fan,
+.opponents[data-count="2"] .opp-fan { height: 26px; }
+.opponents[data-count="1"] .mini-back,
+.opponents[data-count="2"] .mini-back { width: 17px; height: 26px; margin-left: -9px; }
+.opponents[data-count="1"] .opp .opp-cards,
+.opponents[data-count="2"] .opp .opp-cards { font-size: .76rem; }
+
+.opponents[data-count="3"] .opp { padding: 7px 10px 5px; }
+.opponents[data-count="3"] .opp .opp-name { max-width: 80px; font-size: .78rem; }
+.opponents[data-count="3"] .opp .opp-avatar { width: 32px; height: 32px; }
+.opponents[data-count="3"] .opp-fan { height: 20px; }
+.opponents[data-count="3"] .mini-back { width: 13px; height: 20px; margin-left: -7px; }
+.opponents[data-count="3"] .opp .opp-cards { font-size: .68rem; }
+
 /* avatar in lists / lobby */
 .avatar { width: 30px; height: 30px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; border: 2px solid var(--panel-light); display: inline-block; vertical-align: middle; }
 .avatar.emoji { font-size: 1.4rem; border: none; background: none; width: auto; height: auto; }
