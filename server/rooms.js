@@ -368,8 +368,13 @@ class RoomManager {
       }
     } else if (type === 'future') {
       if (p && p.kind === 'future' && p.viewerId === botId) {
-        const deckTop = g.deck[g.deck.length - 1];
-        if (deckTop) g.botMemory[botId] = { topCardId: deckTop.id, topType: deckTop.type };
+        // remember all three peeked cards (top-first), so after drawing one the
+        // bot still knows what's next instead of wastefully peeking again.
+        const top3 = g.deck.slice(-3).reverse();
+        g.botMemory[botId] = {
+          known: top3.map((c) => ({ id: c.id, type: c.type })),
+          shuffleSeq: g.shuffleSeq || 0,
+        };
         g.dismissFuture(botId);
       }
     } else if (type === 'continue') {

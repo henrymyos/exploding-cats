@@ -46,29 +46,50 @@ function findCatPair(hand) {
 function chooseTurnAction(game, bot) {
   const hand = bot.hand;
   const has = (t) => hand.find((c) => c.type === t);
+  const play = (c) => ({ kind: 'play', cardIds: [c.id] });
   const skip = has('SKIP');
   const attack = has('ATTACK');
   const future = has('FUTURE');
   const favor = has('FAVOR');
+  const shuffle = has('SHUFFLE');
   const hasDefuse = !!has('DEFUSE');
 
   const top = game.deck[game.deck.length - 1];
+  // Memory now holds every card seen in the last peek, so after drawing one the
+  // bot still recognises the new top (no needless re-peek). Invalid after a shuffle.
   const mem = game.botMemory[bot.id];
-  const memValid = mem && top && mem.topCardId === top.id;
-  const knownExplodeTop = memValid && mem.topType === 'EXPLODE';
-  const knownSafeTop = memValid && mem.topType !== 'EXPLODE';
+  const memValid = mem && Array.isArray(mem.known) && mem.shuffleSeq === (game.shuffleSeq || 0);
+  const knownEntry = memValid && top ? mem.known.find((k) => k.id === top.id) : null;
+  const knownType = knownEntry ? knownEntry.type : null;
+  const knownExplodeTop = knownType === 'EXPLODE';
+  const knownSafeTop = !!knownType && knownType !== 'EXPLODE';
+  // Public inference: someone peeked at the future and then dodged their draw —
+  // the top is almost certainly an Exploding Cat. (Our own peek, if it says safe,
+  // overrides this.)
+  const suspectTop = !knownSafeTop && top && game.suspectTopId === top.id;
   const risk = explodeRisk(game);
 
-  // 1. We peeked and the next card is an Exploding Cat — dodge if we can't defuse.
-  if (knownExplodeTop && !hasDefuse) {
-    if (skip) return { kind: 'play', cardIds: [skip.id] };
-    if (attack) return { kind: 'play', cardIds: [attack.id] };
-    // no escape — fall through to draw (we lose, but rules are rules)
+  // A way to avoid drawing the current top, best option first.
+  const dodge = () => {
+    if (skip) return play(skip);
+    if (attack) return play(attack);
+    if (shuffle) return play(shuffle); // scramble the bad top out of the way
+    return null;
+  };
+
+  // 1. The next card is (or is very likely) an Exploding Cat — don't draw into it.
+  //    Dodge even if we hold a Defuse, to save the Defuse for a surprise later.
+  if (knownExplodeTop || suspectTop) {
+    const d = dodge();
+    if (d) return d;
+    // Can't dodge. If we only *suspect* (no certainty) and can peek, confirm first.
+    if (suspectTop && !knownExplodeTop && future) return play(future);
+    // Otherwise we draw: survive on a Defuse, or it's a forced loss.
   }
 
-  // 2. Peek when unsure, to inform the dodge decision above next tick.
-  if (!memValid && future && !knownSafeTop && (risk > 0.18 || rnd() < 0.3)) {
-    return { kind: 'play', cardIds: [future.id] };
+  // 2. Peek when we don't already know the top and a draw looks risky.
+  if (!knownType && !suspectTop && future && (risk > 0.18 || rnd() < 0.22)) {
+    return play(future);
   }
 
   const targets = aliveTargets(game, bot);
@@ -84,10 +105,10 @@ function chooseTurnAction(game, bot) {
     return { kind: 'play', cardIds: [favor.id], opts: { targetId: richest(targets).id } };
   }
 
-  // 5. Risky to draw and we don't know the top is safe — bail out.
+  // 5. Don't know the top is safe and the deck is dangerous — bail out if we can.
   if (!knownSafeTop && risk > 0.35) {
-    if (skip) return { kind: 'play', cardIds: [skip.id] };
-    if (attack) return { kind: 'play', cardIds: [attack.id] };
+    const d = dodge();
+    if (d) return d;
   }
 
   // 6. Otherwise, just draw and end the turn.

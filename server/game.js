@@ -47,6 +47,8 @@ class Game {
     this.lastTransfer = null; // { seq, card, fromId, toId, fromName, toName }
     this.lastDiscardBy = null; // id of whoever most recently sent a card to the discard
     this.shuffleSeq = 0;       // increments each time the draw pile is shuffled in play
+    this.turnPeeked = false;   // did the current turn's player look at the future?
+    this.suspectTopId = null;  // top card id a player peeked-then-dodged (likely a kitten)
     this.deal();
     this.logMsg(`${this.currentPlayer().name} goes first!`);
   }
@@ -141,6 +143,7 @@ class Game {
   }
 
   advanceTurn() {
+    this.turnPeeked = false; // peek knowledge doesn't carry into the next turn
     // Move to the next alive player and reset their owed turns.
     this.turnsRemaining -= 1;
     if (this.turnsRemaining > 0) {

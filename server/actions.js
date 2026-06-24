@@ -190,12 +190,18 @@ Game.prototype.resolveAction = function resolveAction() {
 
   this.pending = null;
   const a = p.action;
+  // top card right now (skip/attack leave it in place for the next player)
+  const topNow = this.deck.length ? this.deck[this.deck.length - 1] : null;
 
   switch (a.type) {
     case 'SKIP':
+      // peeked, then bailed on the draw -> the top is probably an Exploding Cat
+      if (this.turnPeeked && topNow) this.suspectTopId = topNow.id;
       this.advanceTurn();
       break;
     case 'ATTACK': {
+      if (this.turnPeeked && topNow) this.suspectTopId = topNow.id;
+      this.turnPeeked = false;
       const carry = Math.max(this.turnsRemaining - 1, 0) + 2;
       this.nextAlive(1);
       this.turnsRemaining = carry;
@@ -205,9 +211,11 @@ Game.prototype.resolveAction = function resolveAction() {
     case 'SHUFFLE':
       shuffle(this.deck);
       this.shuffleSeq = (this.shuffleSeq || 0) + 1;
+      this.suspectTopId = null; // the suspected card moved somewhere unknown
       this.logMsg('The draw pile was shuffled.');
       break;
     case 'FUTURE':
+      this.turnPeeked = true; // this player now knows the top of the deck
       this.pending = {
         kind: 'future',
         actorId: p.actorId,
@@ -362,6 +370,8 @@ Game.prototype.drawCard = function drawCard(playerId) {
 
   const card = this.deck.pop();
   if (!card) return err('The deck is empty.');
+  // this draw consumes the top, so any standing suspicion about it is settled
+  if (this.suspectTopId === card.id) this.suspectTopId = null;
 
   if (card.type === 'EXPLODE') {
     // Reveal the Exploding Kitten to everyone first (dramatic pause), then resolve.
