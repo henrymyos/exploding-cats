@@ -22,9 +22,10 @@ function err(message) {
 const ACTIONABLE = new Set([
   'SKIP', 'ATTACK', 'FAVOR', 'SHUFFLE', 'FUTURE',
   'TARGETED_ATTACK', 'ALTER', 'DRAW_BOTTOM', // Party Pack
+  'REVERSE', 'MARK', 'SWAP_TB', // expansions
 ]);
 // Action cards that need the player to pick a target.
-const NEEDS_TARGET = new Set(['FAVOR', 'TARGETED_ATTACK']);
+const NEEDS_TARGET = new Set(['FAVOR', 'TARGETED_ATTACK', 'MARK']);
 
 // ------------------------------------------------------------------
 // Playing cards from hand
@@ -218,12 +219,29 @@ Game.prototype.resolveAction = function resolveAction() {
       // 2 -> 4 -> 6. (A normal player's own single turn isn't passed along.)
       const imposed = this.turnsFromAttack ? this.turnsRemaining : 0;
       const carry = imposed + 2;
-      this.nextAlive(1);
+      this.nextAlive(this.direction);
       this.turnsRemaining = carry;
       this.turnsFromAttack = true;
       this.logMsg(`${this.currentPlayer().name} must take ${carry} turns!`);
       break;
     }
+    case 'REVERSE':
+      // flip the turn order and end this turn without drawing (a Skip in 2-player)
+      this.direction *= -1;
+      this.logMsg('🔄 Turn order reversed!');
+      this.advanceTurn();
+      break;
+    case 'MARK':
+      this.resolveMark(actor, a);
+      break;
+    case 'SWAP_TB':
+      if (this.deck.length >= 2) {
+        const t = this.deck.length - 1;
+        [this.deck[0], this.deck[t]] = [this.deck[t], this.deck[0]];
+        this.suspectTopId = null;
+        this.logMsg('🔃 The top and bottom of the deck were swapped.');
+      }
+      break;
     case 'SHUFFLE':
       shuffle(this.deck);
       this.shuffleSeq = (this.shuffleSeq || 0) + 1;
@@ -261,7 +279,7 @@ Game.prototype.resolveAction = function resolveAction() {
       const imposed = this.turnsFromAttack ? this.turnsRemaining : 0;
       const carry = imposed + 2;
       const ti = this.players.findIndex((pl) => pl.id === a.targetId && pl.alive);
-      if (ti >= 0) this.turnIndex = ti; else this.nextAlive(1);
+      if (ti >= 0) this.turnIndex = ti; else this.nextAlive(this.direction);
       this.turnsRemaining = carry;
       this.turnsFromAttack = true;
       this.logMsg(`${this.currentPlayer().name} was targeted — they must take ${carry} turns!`);
@@ -341,6 +359,20 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
       this.logMsg(`${actor.name} demanded and took a ${stolen.name} from ${target.name}.`);
     }
   }
+};
+
+// Mark: flip a random card in the target's hand face-up so everyone can see it.
+Game.prototype.resolveMark = function resolveMark(actor, a) {
+  const target = this.playerById(a.targetId);
+  if (!target || !target.alive || target.hand.length === 0) {
+    this.logMsg('The mark fizzled — no card to reveal.');
+    return;
+  }
+  const hidden = target.hand.filter((c) => !c.marked);
+  if (!hidden.length) { this.logMsg(`${target.name}'s hand is already all marked.`); return; }
+  const card = hidden[Math.floor(Math.random() * hidden.length)];
+  card.marked = true; // stays revealed to everyone for the rest of the game
+  this.logMsg(`🔖 ${actor.name} marked ${target.name}'s ${card.name} — now face-up for all to see.`);
 };
 
 // Note the most recent card-take so both players can be shown which card moved.
@@ -437,26 +469,79 @@ Game.prototype.drawCard = function drawCard(playerId) {
   if (this.pending) return err('Resolve the current action first.');
   if (!this.isCurrent(playerId)) return err('It is not your turn.');
   const player = this.playerById(playerId);
-  const card = this.deck.pop(); // top of the deck is the array's end
-  if (!card) return err('The deck is empty.');
+  let card = this.deck.pop(); // top of the deck is the array's end
+  if (!card) {
+    // The pile ran dry. Anyone clinging to a live Exploding Kitten (via a
+    // Streaking Kitten) finally faces it — their luck has run out — which keeps
+    // the game terminating. Otherwise recycle the discard so play continues.
+    const live = player.hand.find((c) => c.type === 'EXPLODE');
+    if (live) {
+      this.removeCardFromHand(player, live.id);
+      this.logMsg(`${player.name}'s streak ended — the draw pile is empty.`);
+      return this.resolveDraw(player, live, true); // no streak save this time
+    }
+    this.recycleDiscard();
+    card = this.deck.pop();
+    if (!card) { this.advanceTurn(); this.checkWin(); return ok({ exploded: false }); }
+  }
   return this.resolveDraw(player, card);
+};
+
+// Shuffle the discard pile (minus its top card, kept for display) back into the
+// draw pile when the deck empties, so the game never deadlocks.
+Game.prototype.recycleDiscard = function recycleDiscard() {
+  if (this.discard.length <= 1) return;
+  const top = this.discard.pop();
+  this.deck = shuffle(this.discard.splice(0));
+  this.discard = [top];
+  this.shuffleSeq = (this.shuffleSeq || 0) + 1;
+  this.logMsg('The draw pile ran out — the discards were shuffled back in.');
 };
 
 // Apply a freshly-drawn card (from the top or, for Draw From the Bottom, the
 // bottom): explode + reveal, or land it in the hand and pause on it.
-Game.prototype.resolveDraw = function resolveDraw(player, card) {
+Game.prototype.resolveDraw = function resolveDraw(player, card, noStreak) {
   // this draw consumes a card, so any standing suspicion about it is settled
   if (this.suspectTopId === card.id) this.suspectTopId = null;
   if (this.defuseWary > 0) this.defuseWary -= 1; // post-defuse caution fades as cards come off
 
+  // Imploding Kitten: can't be defused. First draw flips it face-up and you put
+  // it back; the next person to draw it is gone for good.
+  if (card.type === 'IMPLODE') {
+    if (!card.revealed) {
+      card.revealed = true;
+      this.logMsg(`☢️ ${player.name} drew the Imploding Kitten! It's now face-up — they must put it back.`);
+      this.pending = {
+        kind: 'implodePlace',
+        actorId: player.id,
+        card,
+        maxIndex: this.deck.length,
+        endsAt: Date.now() + 20000,
+        description: `${player.name} is sliding the face-up Imploding Kitten back into the deck.`,
+      };
+      return ok({ implodeReveal: true });
+    }
+    this.logMsg(`☢️💥 ${player.name} drew the face-up Imploding Kitten — no escape!`);
+    this.pending = { kind: 'implode', actorId: player.id, explodeCard: card, endsAt: Date.now() + 6000 };
+    return ok({ imploded: true });
+  }
+
   if (card.type === 'EXPLODE') {
+    // A Streaking Kitten lets you secretly keep a live Exploding Kitten instead of
+    // dying. (Expansion only.)
+    if (!noStreak && player.hand.some((c) => c.type === 'STREAK')) {
+      player.hand.push(card);
+      this.logMsg(`😼 ${player.name} is streaking — they pocketed an Exploding Kitten and lived!`);
+      this.pending = { kind: 'drawn', actorId: player.id, card, endsAt: Date.now() + 30000 };
+      return ok({ exploded: false, card, streaked: true });
+    }
     // Reveal the Exploding Kitten to everyone first (dramatic pause), then resolve.
     this.logMsg(`💥 ${player.name} drew an Exploding Kitten!`);
     this.pending = {
       kind: 'explode',
       actorId: player.id,
       explodeCard: card,
-      hasDefuse: player.hand.some((c) => c.type === 'DEFUSE'),
+      hasDefuse: player.hand.some((c) => c.type === 'DEFUSE' || c.type === 'ZOMBIE'),
       endsAt: Date.now() + 6000,
     };
     return ok({ exploded: true });
@@ -489,6 +574,7 @@ Game.prototype.applyExplode = function applyExplode() {
   const card = this.pending.explodeCard;
   const defuse = player.hand.find((c) => c.type === 'DEFUSE');
   this.lastDiscardBy = player.id;
+  const zombie = this.hasExp('zombie') ? player.hand.find((c) => c.type === 'ZOMBIE') : null;
   if (defuse) {
     this.removeCardFromHand(player, defuse.id);
     this.discard.push(defuse);
@@ -500,18 +586,92 @@ Game.prototype.applyExplode = function applyExplode() {
       endsAt: Date.now() + 20000,
       description: `${player.name} is sneaking the Exploding Kitten back into the deck.`,
     };
+  } else if (zombie) {
+    // Zombie Kitten: survive AND drag a dead player back into the game.
+    this.removeCardFromHand(player, zombie.id);
+    this.discard.push(zombie);
+    this.logMsg(`🧟 ${player.name} played a Zombie Kitten and clawed back from the brink!`);
+    this.resurrectOne();
+    this.pending = {
+      kind: 'defuse',
+      actorId: player.id,
+      explodeCard: card,
+      endsAt: Date.now() + 20000,
+      description: `${player.name} is hiding the Exploding Kitten back in the deck.`,
+    };
   } else {
-    // No defuse — they're out, and their whole hand goes to the discard pile.
-    while (player.hand.length) this.discard.push(player.hand.pop());
-    this.discard.push(card); // the Exploding Cat lands on top
-    player.alive = false;
-    this.logMsg(`💥 ${player.name} exploded! They are out — their cards go to the discard pile.`);
-    this.turnsRemaining = 1;
-    this.turnsFromAttack = false; // exploded player's attack-turns die with them
-    this.nextAlive(1);
+    this.eliminate(player, card, '💥', 'exploded');
     this.pending = null;
     this.checkWin();
   }
+};
+
+// Bring the longest-dead player back to life with a single Defuse to start.
+Game.prototype.resurrectOne = function resurrectOne() {
+  while (this.deadOrder.length) {
+    const id = this.deadOrder.shift();
+    const p = this.playerById(id);
+    if (p && !p.alive) {
+      p.alive = true;
+      p.hand = [this.makeOne('DEFUSE')];
+      this.logMsg(`🧟 ${p.name} was dragged back to life!`);
+      return;
+    }
+  }
+};
+
+// Knock a player out: discard their hand, mark them dead, and pass the turn.
+// In Zombie mode they can still be dragged back later (see Zombie Kitten).
+Game.prototype.eliminate = function eliminate(player, card, icon, verb) {
+  while (player.hand.length) this.discard.push(player.hand.pop());
+  if (card) this.discard.push(card);
+  player.alive = false;
+  if (!this.deadOrder.includes(player.id)) this.deadOrder.push(player.id);
+  this.logMsg(`${icon || '💥'} ${player.name} ${verb || 'is out'}! Their cards go to the discard pile.`);
+  this.turnsRemaining = 1;
+  this.turnsFromAttack = false; // their attack-turns die with them
+  this.nextAlive(this.direction);
+};
+
+// ---- Imploding Kitten (un-defusable) ----
+
+// First draw: slide the now-face-up Imploding Kitten back into the deck.
+Game.prototype.implodePlace = function implodePlace(playerId, index) {
+  if (!this.pending || this.pending.kind !== 'implodePlace') return err('Nothing to place.');
+  if (this.pending.actorId !== playerId) return err('Not your Imploding Kitten.');
+  const card = this.pending.card;
+  let i = Number.isInteger(index) ? index : Math.floor(Math.random() * (this.deck.length + 1));
+  i = Math.max(0, Math.min(i, this.deck.length));
+  this.deck.splice(this.deck.length - i, 0, card); // index 0 = top (array end)
+  this.logMsg('The face-up Imploding Kitten is back in the deck — whoever draws it next is done for.');
+  this.defuseWary = 3;
+  this.pending = null;
+  this.advanceTurn();
+  this.checkWin();
+  return ok();
+};
+
+Game.prototype.implodePlaceAuto = function implodePlaceAuto() {
+  if (this.pending && this.pending.kind === 'implodePlace') {
+    this.implodePlace(this.pending.actorId, Math.floor(Math.random() * (this.deck.length + 1)));
+  }
+};
+
+// Second draw of the face-up Imploding Kitten — no defuse, you're gone.
+Game.prototype.resolveImplode = function resolveImplode(playerId) {
+  if (!this.pending || this.pending.kind !== 'implode') return err('Nothing to resolve.');
+  if (playerId && this.pending.actorId !== playerId) return err('Not your implosion.');
+  this.applyImplode();
+  return ok();
+};
+
+Game.prototype.applyImplode = function applyImplode() {
+  if (!this.pending || this.pending.kind !== 'implode') return;
+  const player = this.playerById(this.pending.actorId);
+  this.lastDiscardBy = player.id;
+  this.eliminate(player, this.pending.explodeCard, '☢️', 'imploded — no defuse could save them');
+  this.pending = null;
+  this.checkWin();
 };
 
 // End the turn after reviewing a drawn card.
@@ -579,6 +739,12 @@ Game.prototype.describeAction = function describeAction(type, player, target) {
       return `${player.name} is rearranging the top of the deck.`;
     case 'DRAW_BOTTOM':
       return `${player.name} is drawing from the bottom of the deck.`;
+    case 'REVERSE':
+      return `${player.name} is reversing the turn order.`;
+    case 'MARK':
+      return `${player.name} is marking a card in ${target ? target.name : "someone"}'s hand.`;
+    case 'SWAP_TB':
+      return `${player.name} is swapping the top and bottom of the deck.`;
     default:
       return `${player.name} played a card.`;
   }

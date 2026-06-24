@@ -212,6 +212,22 @@ function renderLobby(lobby) {
     } : null;
   });
   $('modeHint').textContent = isCreator ? 'You pick the deck for this game.' : 'Only the game creator can change the deck.';
+  // expansion toggles — also creator-only
+  const expansions = lobby.expansions || [];
+  const expBox = $('expansionSelect');
+  expBox.classList.toggle('readonly', !isCreator);
+  expBox.querySelectorAll('.exp-opt').forEach((label) => {
+    const cb = label.querySelector('input');
+    const on = expansions.includes(cb.dataset.exp);
+    cb.checked = on;
+    cb.disabled = !isCreator;
+    label.classList.toggle('on', on);
+    cb.onchange = isCreator ? () => {
+      socket.emit('setExpansion', { code: state.code, playerId: PLAYER_ID, key: cb.dataset.exp, on: cb.checked }, (res) => {
+        if (res && !res.ok) { toast(res.error, true); cb.checked = !cb.checked; }
+      });
+    } : null;
+  });
   const enough = lobby.players.length >= 2;
   const full = lobby.players.length >= maxForMode;
   const botCount = lobby.players.filter((p) => p.isBot).length;
@@ -299,10 +315,14 @@ function renderGame(g, lobby) {
     const avEl = avById[p.id]
       ? `<span class="opp-avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>`
       : `<span class="opp-avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
+    const marked = (p.marked && p.marked.length)
+      ? `<div class="opp-marked">🔖 ${p.marked.map((c) => escapeHtml(c.name)).join(', ')}</div>`
+      : '';
     div.innerHTML =
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
       `<div class="opp-fan">${fan}</div>` +
-      `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
+      `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>` +
+      marked;
     if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
     keepIds.add(p.id);
   });
@@ -579,7 +599,7 @@ function screenShake() {
 let prevDrawnKey = null;
 function handleDrawAnimation(g) {
   const p = g.pending;
-  const key = p && (p.kind === 'drawn' || p.kind === 'explode') ? p.actorId : null;
+  const key = p && (p.kind === 'drawn' || p.kind === 'explode' || p.kind === 'implode') ? p.actorId : null;
   if (key && key !== prevDrawnKey) {
     // Your own draw flies from the deck to the reveal card on the left;
     // opponents' draws fly from the deck to their seat.
@@ -834,12 +854,15 @@ function renderHandActions(g, me, isMyTurn) {
   if (sel.length === 1) {
     const c = sel[0];
     if (c.type === 'CAT') { addActionLabel(bar, 'Need a matching pair'); return; }
-    if (c.type === 'DEFUSE' || c.type === 'EXPLODE' || c.type === 'NOPE') {
+    if (c.type === 'DEFUSE' || c.type === 'EXPLODE' || c.type === 'NOPE' || c.type === 'IMPLODE') {
       addActionLabel(bar, 'Can’t play that on its own'); return;
     }
+    if (c.type === 'STREAK') { addActionLabel(bar, 'Hold it — lets you survive an Exploding Kitten'); return; }
+    if (c.type === 'ZOMBIE') { addActionLabel(bar, 'Hold it — saves you & revives a dead player'); return; }
     const label = `Play ${c.name}`;
     if (c.type === 'FAVOR') addActionBtn(bar, label, () => promptTarget(me, g, sel, 'favor'));
     else if (c.type === 'TARGETED_ATTACK') addActionBtn(bar, label, () => promptTarget(me, g, sel, 'attack'));
+    else if (c.type === 'MARK') addActionBtn(bar, label, () => promptTarget(me, g, sel, 'mark'));
     else addActionBtn(bar, label, () => doPlay(sel.map((x) => x.id)));
     return;
   }
@@ -888,7 +911,8 @@ function promptTarget(me, g, sel, mode) {
   // only one other player — no need to ask
   if (opps.length === 1) { doPlay(sel.map((c) => c.id), { targetId: opps[0].id }); return; }
   const title = mode === 'favor' ? 'Ask a favor from whom?'
-    : mode === 'attack' ? 'Attack whom?' : 'Steal from whom?';
+    : mode === 'attack' ? 'Attack whom?'
+    : mode === 'mark' ? 'Mark whose card?' : 'Steal from whom?';
   openOverlay(`
     <h2>${title}</h2>
     <div class="choice-grid">
@@ -949,7 +973,7 @@ function renderPending(g, me) {
   const p = g.pending;
   $('hissBar').classList.add('hidden');
   // Keep the left side panel for my own drawn card, or anyone's Exploding Cat.
-  const keepReveal = p && ((p.kind === 'drawn' && p.youDrew) || p.kind === 'explode');
+  const keepReveal = p && ((p.kind === 'drawn' && p.youDrew) || p.kind === 'explode' || p.kind === 'implode');
   if (!keepReveal) hideDrawReveal();
   if (!p) { area.textContent = ''; return; }
   area.textContent = p.description || '';
@@ -986,10 +1010,10 @@ function renderPending(g, me) {
     area.textContent = `🎁 Tap a card to give to ${escapeHtml(p.actorName || 'them')}`;
   }
 
-  // Defuse: I must place the exploding cat back
-  if (p.kind === 'defuse' && p.youMustPlace) {
-    showDefuse(p.maxIndex);
-  }
+  // Place a kitten back: Defuse (Exploding) or the face-up Imploding Kitten.
+  if (p.kind === 'defuse' && p.youMustPlace) showDefuse(p.maxIndex, false);
+  else if (p.kind === 'implodePlace' && p.youPlaceImplode) showDefuse(p.maxIndex, true);
+  else if (overlayMode === 'defuse') closeOverlay();
 
   // Steal: I pick a face-down card from the target's hand
   if (p.kind === 'stealPick' && p.youSteal) {
@@ -1008,6 +1032,12 @@ function renderPending(g, me) {
   if (p.kind === 'explode') {
     showExplodeReveal(p);
     area.textContent = `💥 ${p.actorName} drew an Exploding Kitten!`;
+  }
+
+  // Imploding Kitten (fatal second draw) reveal.
+  if (p.kind === 'implode') {
+    showExplodeReveal(p);
+    area.textContent = `☢️ ${p.actorName} drew the face-up Imploding Kitten — no escape!`;
   }
 }
 
@@ -1040,33 +1070,36 @@ function hideDrawReveal() {
   revealShownFor = null;
 }
 
-// Everyone sees the Exploding Cat on the left before it resolves.
+// Everyone sees the (Ex/Im)ploding Kitten on the left before it resolves.
 function showExplodeReveal(p) {
   const panel = $('drawReveal');
-  const key = `explode:${p.actorId}`;
+  const isImplode = p.kind === 'implode';
+  const key = `${p.kind}:${p.actorId}`;
   if (revealShownFor === key) return;
   revealShownFor = key;
-  const card = p.explodeCard || { type: 'EXPLODE', name: 'Exploding Kitten' };
-  let msg;
-  let btn = '';
-  if (p.youExploded) {
+  const card = p.explodeCard || { type: isImplode ? 'IMPLODE' : 'EXPLODE', name: isImplode ? 'Imploding Kitten' : 'Exploding Kitten' };
+  const mine = p.actorId === PLAYER_ID;
+  const title = isImplode ? '☢️ Imploding Kitten!' : '💥 Exploding Kitten!';
+  let msg, btn = '';
+  if (mine && isImplode) {
+    msg = '☢️ No defuse can save you — you’re out!';
+    btn = `<button class="btn danger" id="implodeContinueBtn">Continue</button>`;
+  } else if (mine) {
     msg = p.hasDefuse ? '😼 Quick — play your Defuse!' : '💥 You exploded — you’re out!';
     btn = `<button class="btn danger" id="explodeContinueBtn">Continue</button>`;
   } else {
     msg = `${escapeHtml(p.actorName)} drew it!`;
   }
   panel.innerHTML =
-    `<div class="reveal-title">💥 Exploding Kitten!</div>` +
-    `<div class="reveal-card"><div class="card" data-type="EXPLODE">${cardFace(card)}</div></div>` +
+    `<div class="reveal-title">${title}</div>` +
+    `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
     `<p class="hint">${msg}</p>${btn}`;
   panel.classList.remove('hidden');
   panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
   const b = document.getElementById('explodeContinueBtn');
-  if (b) b.onclick = () => {
-    socket.emit('continueExplode', { code: state.code, playerId: PLAYER_ID }, (res) => {
-      if (!res.ok) toast(res.error, true);
-    });
-  };
+  if (b) b.onclick = () => socket.emit('continueExplode', { code: state.code, playerId: PLAYER_ID }, (res) => { if (!res.ok) toast(res.error, true); });
+  const ib = document.getElementById('implodeContinueBtn');
+  if (ib) ib.onclick = () => socket.emit('continueImplode', { code: state.code, playerId: PLAYER_ID }, (res) => { if (!res.ok) toast(res.error, true); });
 }
 
 // Identifies one Nope window. Changes whenever the chain advances (a Nope is
@@ -1181,7 +1214,7 @@ function showStealPick(p) {
   });
 }
 
-function showDefuse(maxIndex) {
+function showDefuse(maxIndex, isImplode) {
   if (overlayMode === 'defuse') return;
   overlayMode = 'defuse';
   // index 0 = top (next draw), maxIndex = bottom. Offer only positions that exist
@@ -1195,9 +1228,13 @@ function showDefuse(maxIndex) {
   add('2nd from top', 1);
   add('3rd from top', 2);
   add('Bottom', maxIndex);
+  const heading = isImplode ? '☢️ Imploding Kitten' : '🧨 Defused!';
+  const hint = isImplode
+    ? "It's face-up now — slide it back where someone else will draw it (no defuse can stop it):"
+    : "Sneak the Exploding Kitten back where the others won't expect it:";
   openOverlay(`
-    <h2>🧨 Defused!</h2>
-    <p class="hint">Sneak the Exploding Kitten back where the others won't expect it:</p>
+    <h2>${heading}</h2>
+    <p class="hint">${hint}</p>
     <div class="choice-grid">
       ${options.map((o) => `<button class="choice" data-idx="${o.idx}">${o.label}</button>`).join('')}
     </div>
@@ -1205,7 +1242,8 @@ function showDefuse(maxIndex) {
   $('overlayBox').querySelectorAll('.choice').forEach((btn) => {
     btn.onclick = () => {
       const idx = parseInt(btn.dataset.idx, 10);
-      socket.emit('defusePlace', { code: state.code, playerId: PLAYER_ID, index: idx }, (res) => {
+      const ev = isImplode ? 'implodePlace' : 'defusePlace';
+      socket.emit(ev, { code: state.code, playerId: PLAYER_ID, index: idx }, (res) => {
         if (!res.ok) toast(res.error, true);
       });
       closeOverlay();
@@ -1294,6 +1332,13 @@ const GLYPHS = {
   ALTER: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 22h28 M34 14l8 8-8 8"/><path d="M50 42H22 M30 34l-8 8 8 8"/></svg>',
   DRAW_BOTTOM: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M32 8v36 M18 30l14 14 14-14"/><path d="M12 54h40"/></svg>',
   FERAL: '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/><path d="M44 6l3 7 7 3-7 3-3 7-3-7-7-3 7-3z"/></svg>',
+  // ---- Expansions ----
+  IMPLODE: '<svg viewBox="0 0 64 64"><path d="M32 32 L14 8 A30 30 0 0 1 50 8 Z"/><path d="M32 32 L56 14 A30 30 0 0 1 56 50 Z" opacity=".8"/><path d="M32 32 L50 56 A30 30 0 0 1 14 56 Z" opacity=".6"/><path d="M32 32 L8 50 A30 30 0 0 1 8 14 Z" opacity=".7"/><circle cx="32" cy="32" r="5" fill="#1a1430"/></svg>',
+  REVERSE: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M16 26 A18 18 0 0 1 48 22 M48 14 v10 h-10"/><path d="M48 38 A18 18 0 0 1 16 42 M16 50 v-10 h10"/></svg>',
+  MARK: '<svg viewBox="0 0 64 64"><path d="M44 6 H20 a4 4 0 0 0-4 4 v48 l16-10 16 10 V10 a4 4 0 0 0-4-4z"/></svg>',
+  SWAP_TB: '<svg viewBox="0 0 64 64" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12 v40 M22 12 l-8 8 M22 12 l8 8"/><path d="M42 52 V12 M42 52 l-8-8 M42 52 l8-8"/></svg>',
+  STREAK: '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/><path d="M6 12 h16 M4 22 h12" stroke="#fff" stroke-width="4" stroke-linecap="round"/></svg>',
+  ZOMBIE: '<svg viewBox="0 0 64 64"><circle cx="32" cy="30" r="22"/><circle cx="24" cy="28" r="4.5" fill="#1a1430"/><circle cx="40" cy="28" r="4.5" fill="#1a1430"/><path d="M22 42 h20 M27 42 v6 M32 42 v6 M37 42 v6" stroke="#1a1430" stroke-width="2.5"/></svg>',
 };
 
 const PAW_SVG = '<svg viewBox="0 0 64 64"><ellipse cx="32" cy="44" rx="13" ry="10"/><circle cx="17" cy="31" r="5.5"/><circle cx="47" cy="31" r="5.5"/><circle cx="25" cy="20" r="5.5"/><circle cx="39" cy="20" r="5.5"/></svg>';
@@ -1396,6 +1441,12 @@ const ACTION_PHOTOS = {
   TARGETED_ATTACK: ['loki.png', 'loki2.png'],
   ALTER:           ['loki3.png', 'genevieve3.png'],
   DRAW_BOTTOM:     ['pepper3.png', 'gambit3.png'],
+  // Expansion types
+  IMPLODE:         ['gambit.png', 'gambit2.png'],
+  REVERSE:         ['pepper.png', 'pepper2.png'],
+  MARK:            ['max3.png', 'max4.png'],
+  SWAP_TB:         ['pepper3.png', 'gambit3.png'],
+  ZOMBIE:          ['gambit2.png', 'gambit3.png'],
 };
 
 function photoFor(card) {

@@ -151,6 +151,17 @@ h1 { font-size: 2rem; margin: 0; }
 .mode-select.readonly .mode-opt { opacity: .45; }
 .mode-select.readonly .mode-opt.on { opacity: 1; }
 
+/* expansion toggles */
+.expansion-select { display: flex; flex-direction: column; gap: 6px; margin: 4px 0 6px; }
+.exp-title { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+.exp-opt { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 10px; background: var(--bg2); cursor: pointer; }
+.exp-opt input { width: 20px; height: 20px; accent-color: var(--accent2); flex-shrink: 0; }
+.exp-opt b { display: block; font-size: .85rem; }
+.exp-opt small { display: block; font-size: .66rem; color: var(--muted); }
+.exp-opt.on { background: var(--panel-light); box-shadow: inset 0 0 0 1px var(--accent2); }
+.expansion-select.readonly .exp-opt { cursor: default; opacity: .6; }
+.expansion-select.readonly .exp-opt.on { opacity: 1; }
+
 .bot-controls { display: flex; gap: 8px; margin: 10px 0; }
 .bot-controls .btn { margin-top: 0; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); }
@@ -176,6 +187,7 @@ h1 { font-size: 2rem; margin: 0; }
 .opp-head { display: flex; align-items: center; justify-content: center; gap: 5px; }
 .opp .opp-name { font-weight: 600; font-size: .85rem; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opp .opp-cards { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+.opp .opp-marked { font-size: .6rem; color: var(--accent2); margin-top: 1px; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opp .opp-avatar { width: 28px; height: 28px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; border: 2px solid var(--panel-light); }
 .opp .opp-avatar.emoji { font-size: 1.4rem; border: none; background: none; width: auto; height: auto; }
 .opp.active .opp-avatar { border-color: var(--accent2); }
@@ -362,6 +374,12 @@ h1 { font-size: 2rem; margin: 0; }
 .card[data-type="ALTER"] { background: linear-gradient(160deg, #5ee0e0, #2a6ea8); }
 .card[data-type="DRAW_BOTTOM"] { background: linear-gradient(160deg, #ffcf5e, #b56a1a); }
 .card[data-type="FERAL"] { background: linear-gradient(160deg, #b07cff, #5a2a9d); }
+.card[data-type="IMPLODE"] { background: linear-gradient(160deg, #b06a2a, #5a2a0a); }
+.card[data-type="REVERSE"] { background: linear-gradient(160deg, #7affc4, #2a9d8f); }
+.card[data-type="MARK"] { background: linear-gradient(160deg, #ff9f4a, #b5560f); }
+.card[data-type="SWAP_TB"] { background: linear-gradient(160deg, #ffd76b, #b5860f); }
+.card[data-type="STREAK"] { background: linear-gradient(160deg, #ff8fcf, #b53a7a); }
+.card[data-type="ZOMBIE"] { background: linear-gradient(160deg, #8fc46b, #3a7a2a); }
 .card[data-type="CAT"] { background: linear-gradient(160deg, var(--panel-light), #2a2150); }
 
 /* the discard pile shows the played card's type color as a border + banner */
@@ -378,6 +396,12 @@ h1 { font-size: 2rem; margin: 0; }
 .card-mini[data-type="ALTER"]   { border-color: #5ee0e0; background: linear-gradient(160deg, #5ee0e0, #2a6ea8); }
 .card-mini[data-type="DRAW_BOTTOM"] { border-color: #ffcf5e; background: linear-gradient(160deg, #ffcf5e, #b56a1a); }
 .card-mini[data-type="FERAL"]   { border-color: #b07cff; background: linear-gradient(160deg, #b07cff, #5a2a9d); }
+.card-mini[data-type="IMPLODE"] { border-color: #b06a2a; background: linear-gradient(160deg, #b06a2a, #5a2a0a); }
+.card-mini[data-type="REVERSE"] { border-color: #7affc4; background: linear-gradient(160deg, #7affc4, #2a9d8f); }
+.card-mini[data-type="MARK"]    { border-color: #ff9f4a; background: linear-gradient(160deg, #ff9f4a, #b5560f); }
+.card-mini[data-type="SWAP_TB"] { border-color: #ffd76b; background: linear-gradient(160deg, #ffd76b, #b5860f); }
+.card-mini[data-type="STREAK"]  { border-color: #ff8fcf; background: linear-gradient(160deg, #ff8fcf, #b53a7a); }
+.card-mini[data-type="ZOMBIE"]  { border-color: #8fc46b; background: linear-gradient(160deg, #8fc46b, #3a7a2a); }
 .card-mini[data-type="CAT"]     { border-color: var(--accent2); background: linear-gradient(160deg, var(--panel-light), #2a2150); }
 
 /* stacked / fanned hand: identical cards grouped into one tappable pile */

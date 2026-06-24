@@ -37,7 +37,42 @@ const CARD_DEFS = {
   ALTER:           { type: 'ALTER',           name: 'Alter the Future',      blurb: 'Privately view AND rearrange the top three cards.' },
   DRAW_BOTTOM:     { type: 'DRAW_BOTTOM',     name: 'Draw From the Bottom',  blurb: 'End your turn by drawing the BOTTOM card instead of the top.' },
   FERAL:           { type: 'FERAL',           name: 'Feral Cat',             blurb: 'A wild cat — use it as any cat card in a combo.' },
+  // ---- Expansion cards ----
+  IMPLODE:         { type: 'IMPLODE',         name: 'Imploding Kitten',      blurb: 'Cannot be defused. First draw flips it face-up; next draw is fatal.' },
+  REVERSE:         { type: 'REVERSE',         name: 'Reverse',               blurb: 'Reverse the turn order and end your turn without drawing.' },
+  STREAK:          { type: 'STREAK',          name: 'Streaking Kitten',      blurb: 'While you hold this, you can keep an Exploding Kitten without dying.' },
+  MARK:            { type: 'MARK',            name: 'Mark',                  blurb: "Force a random card in a player's hand to stay face-up for all to see." },
+  SWAP_TB:         { type: 'SWAP_TB',         name: 'Swap Top and Bottom',   blurb: 'Swap the top and bottom cards of the draw pile.' },
+  ZOMBIE:          { type: 'ZOMBIE',          name: 'Zombie Kitten',         blurb: 'Survive an Exploding Kitten — and drag a dead player back to life.' },
 };
+
+// ---- Expansions: optional card/rule add-ons that layer on either base deck. ----
+// `actions`  = ordinary cards mixed into the draw pile.
+// `special`  = setup hooks handled in Game.deal (implode/streak/zombie cards).
+const EXPANSIONS = {
+  imploding: {
+    label: 'Imploding Kittens',
+    blurb: 'Adds the un-defusable Imploding Kitten + Reverse.',
+    actions: { REVERSE: 4 },
+    special: { implode: 1 },
+  },
+  streaking: {
+    label: 'Streaking Kittens',
+    blurb: 'Hold an Exploding Kitten without dying, plus Mark & Swap.',
+    actions: { MARK: 3, SWAP_TB: 2 },
+    special: { streak: 2 },
+  },
+  zombie: {
+    label: 'Zombie mode',
+    blurb: "Death isn't the end — explode and a Zombie Kitten can bring you back.",
+    special: { zombie: 3 },
+  },
+};
+
+function cleanExpansions(list) {
+  const set = new Set(Array.isArray(list) ? list : []);
+  return Object.keys(EXPANSIONS).filter((k) => set.has(k));
+}
 
 // ---- Per-mode deck composition. ----
 // A count map uses DEFUSE / CAT (copies per cat type) / FERAL plus action types.
@@ -100,4 +135,4 @@ function catList() {
   return CATS.map((c) => ({ ...c }));
 }
 
-module.exports = { CATS, CARD_DEFS, MODES, modeConfig, resolveDeck, catList };
+module.exports = { CATS, CARD_DEFS, MODES, EXPANSIONS, modeConfig, resolveDeck, cleanExpansions, catList };

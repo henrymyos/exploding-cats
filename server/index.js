@@ -35,6 +35,7 @@ function broadcast(code) {
     hostId: room.hostId,
     started: !!room.game,
     mode: room.mode || 'original',
+    expansions: room.expansions || [],
     creatorId: room.creatorId || room.hostId,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, isBot: !!p.isBot, avatar: p.avatar || null })),
     scores: manager.scoreboard(room),
@@ -78,6 +79,13 @@ io.on('connection', (socket) => {
 
   socket.on('setMode', ({ code, playerId, mode }, cb) => {
     const { error } = manager.setMode(code, playerId, mode);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
+  });
+
+  socket.on('setExpansion', ({ code, playerId, key, on }, cb) => {
+    const { error } = manager.setExpansion(code, playerId, key, on);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
@@ -164,6 +172,14 @@ io.on('connection', (socket) => {
 
   socket.on('defusePlace', ({ code, playerId, index }, cb) => {
     withGame(code, (g) => g.defusePlace(playerId, index), cb);
+  });
+
+  socket.on('implodePlace', ({ code, playerId, index }, cb) => {
+    withGame(code, (g) => g.implodePlace(playerId, index), cb);
+  });
+
+  socket.on('continueImplode', ({ code, playerId }, cb) => {
+    withGame(code, (g) => g.resolveImplode(playerId), cb);
   });
 
   socket.on('dismissFuture', ({ code, playerId }, cb) => {

@@ -2,7 +2,7 @@
 
 const { Game } = require('./game');
 const brain = require('./botBrain');
-const { catList, modeConfig } = require('./cards');
+const { catList, modeConfig, EXPANSIONS, cleanExpansions } = require('./cards');
 require('./actions'); // augments Game.prototype
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
@@ -56,6 +56,7 @@ class RoomManager {
       hostId,
       creatorId: hostId, // the one who made the room — only they may switch decks
       mode: mode === 'party' ? 'party' : 'original',
+      expansions: [],    // enabled expansion keys, e.g. ['imploding','zombie']
       players: [{ id: hostId, name: hostName, connected: true, avatar: cleanAvatar(avatar) }],
       game: null,
       timer: null,
@@ -79,6 +80,19 @@ class RoomManager {
       return { error: `Too many players for ${modeConfig(next).label}.` };
     }
     room.mode = next;
+    return { room };
+  }
+
+  // Creator toggles an expansion (Imploding / Streaking / Zombie) in the lobby.
+  setExpansion(code, playerId, key, on) {
+    const room = this.getRoom(code);
+    if (!room) return { error: 'No room with that code.' };
+    if (room.creatorId !== playerId) return { error: 'Only the game creator can change expansions.' };
+    if (room.game) return { error: 'Cannot change expansions mid-game.' };
+    if (!EXPANSIONS[key]) return { error: 'Unknown expansion.' };
+    const set = new Set(room.expansions || []);
+    if (on) set.add(key); else set.delete(key);
+    room.expansions = cleanExpansions([...set]);
     return { room };
   }
 
@@ -163,7 +177,7 @@ class RoomManager {
     if (!room.players.find((p) => p.id === room.hostId)) room.hostId = room.players[0].id;
     if (room.timer) { clearTimeout(room.timer); room.timer = null; }
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
-    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode);
+    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode, room.expansions);
     this.scheduleResolve(room);
     this.scheduleBots(room);
     return { room };
@@ -210,7 +224,7 @@ class RoomManager {
     if (room.hostId !== playerId) return { error: 'Only the host can start the game.' };
     if (room.game) return { error: 'Game already started.' };
     if (room.players.length < MIN_PLAYERS) return { error: 'Need at least 2 players.' };
-    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode);
+    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode, room.expansions);
     this.scheduleResolve(room);
     this.scheduleBots(room);
     return { room };
@@ -246,6 +260,8 @@ class RoomManager {
     else if (kind === 'explode') game.applyExplode();
     else if (kind === 'stealPick') game.stealAuto();
     else if (kind === 'alter') game.alterAuto();
+    else if (kind === 'implodePlace') game.implodePlaceAuto();
+    else if (kind === 'implode') game.applyImplode();
     // A resolution can open a NEW pending (e.g. action -> favorPick); chain it.
     this.scheduleResolve(room);
     this.recordResultIfFinished(room);
@@ -357,6 +373,14 @@ class RoomManager {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'explode', p.actorId), rand(1200, 2000));
       return;
     }
+    if (p && p.kind === 'implode' && this.isBot(g, p.actorId)) {
+      room.botTimer = setTimeout(() => this.runBotJob(room, 'resolveImplode', p.actorId), rand(1200, 2000));
+      return;
+    }
+    if (p && p.kind === 'implodePlace' && this.isBot(g, p.actorId)) {
+      room.botTimer = setTimeout(() => this.runBotJob(room, 'implodePlace', p.actorId), rand(700, 1400));
+      return;
+    }
     if (p && p.kind === 'stealPick' && this.isBot(g, p.actorId)) {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'steal', p.actorId), rand(700, 1300));
       return;
@@ -419,6 +443,12 @@ class RoomManager {
       if (p && p.kind === 'drawn' && p.actorId === botId) g.continueTurn(botId);
     } else if (type === 'explode') {
       if (p && p.kind === 'explode' && p.actorId === botId) g.resolveExplode(botId);
+    } else if (type === 'resolveImplode') {
+      if (p && p.kind === 'implode' && p.actorId === botId) g.resolveImplode(botId);
+    } else if (type === 'implodePlace') {
+      if (p && p.kind === 'implodePlace' && p.actorId === botId) {
+        g.implodePlace(botId, brain.chooseDefuseIndex(g)); // hide it like a defused kitten
+      }
     } else if (type === 'steal') {
       if (p && p.kind === 'stealPick' && p.actorId === botId) {
         const target = g.playerById(p.targetId);

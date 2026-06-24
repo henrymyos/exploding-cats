@@ -1,6 +1,6 @@
 'use strict';
 
-const { CARD_DEFS, MODES, resolveDeck, catList } = require('./cards');
+const { CARD_DEFS, MODES, EXPANSIONS, resolveDeck, cleanExpansions, catList } = require('./cards');
 
 let cardSeq = 0;
 function makeCard(props) {
@@ -22,9 +22,11 @@ function shuffle(arr) {
  * The server is the single source of truth; clients only render snapshots.
  */
 class Game {
-  constructor(playerList, mode) {
+  constructor(playerList, mode, expansions) {
     // playerList: [{ id, name, isBot? }]; mode: 'original' | 'party'
     this.mode = MODES[mode] ? mode : 'original';
+    this.expansions = cleanExpansions(expansions); // e.g. ['imploding','zombie']
+    this.hasExp = (k) => this.expansions.includes(k);
     // deck composition depends on the mode AND player count (Party Pack scales)
     this.cfg = resolveDeck(this.mode, playerList.length);
     this.players = playerList.map((p) => ({
@@ -42,6 +44,8 @@ class Game {
     this.turnIndex = Math.floor(Math.random() * this.players.length);
     this.turnsRemaining = 1; // how many draws current player still owes (Attack stacks this)
     this.turnsFromAttack = false; // are the current player's turns imposed by an Attack?
+    this.direction = 1;        // turn order direction (flipped by Reverse)
+    this.deadOrder = [];       // ids in death order, for Zombie resurrection
     this.phase = 'playing'; // 'playing' | 'finished'
     this.winnerId = null;
     this.log = [];
@@ -85,6 +89,23 @@ class Game {
       cards.push(makeCard({ type: def.type, name: def.name, blurb: def.blurb }));
     }
 
+    // Expansion cards mixed into the draw pile (Reverse, Mark, Swap, Streaking
+    // Kitten, Zombie Kitten). Skip any type already present from the base deck.
+    const present = new Set(cards.map((c) => c.type));
+    for (const key of this.expansions) {
+      const exp = EXPANSIONS[key];
+      const adds = { ...(exp.actions || {}) };
+      if (exp.special && exp.special.streak) adds.STREAK = exp.special.streak;
+      if (exp.special && exp.special.zombie) adds.ZOMBIE = exp.special.zombie;
+      for (const type of Object.keys(adds)) {
+        if (present.has(type)) continue; // don't double-add an existing type
+        const def = CARD_DEFS[type];
+        for (let i = 0; i < adds[type]; i += 1) {
+          cards.push(makeCard({ type: def.type, name: def.name, blurb: def.blurb }));
+        }
+      }
+    }
+
     return cards;
   }
 
@@ -120,12 +141,23 @@ class Game {
       );
     }
 
+    // Imploding Kitten: one un-defusable kitten, starts face-down.
+    if (this.hasExp('imploding')) {
+      deck.push(makeCard({ type: 'IMPLODE', name: CARD_DEFS.IMPLODE.name, blurb: CARD_DEFS.IMPLODE.blurb, revealed: false }));
+    }
+
     shuffle(deck);
     this.deck = deck;
     this.logMsg('The cats have been dealt. Good luck.');
   }
 
   // ---------- helpers ----------
+
+  // Mint a fresh card of a given type (used e.g. to arm a resurrected player).
+  makeOne(type) {
+    const def = CARD_DEFS[type];
+    return makeCard({ type: def.type, name: def.name, blurb: def.blurb });
+  }
 
   logMsg(text) {
     this.log.push({ t: Date.now(), text });
@@ -163,7 +195,7 @@ class Game {
       this.logMsg(`${this.currentPlayer().name} still owes ${this.turnsRemaining} more turn(s).`);
       return;
     }
-    this.nextAlive(1);
+    this.nextAlive(this.direction);
     this.turnsRemaining = 1;
     this.turnsFromAttack = false; // a fresh normal turn for the next player
   }
@@ -196,6 +228,7 @@ class Game {
     return {
       phase: this.phase,
       mode: this.mode,
+      expansions: this.expansions,
       winnerId: this.winnerId,
       deckCount: this.deck.length,
       discardTop: this.discard.length ? this.discard[this.discard.length - 1] : null,
@@ -208,6 +241,8 @@ class Game {
         isBot: p.isBot || p.botControlled,
         alive: p.alive,
         handCount: p.hand.length,
+        // Mark (Streaking Kittens) flips cards face-up for everyone to see.
+        marked: p.hand.filter((c) => c.marked).map((c) => ({ type: c.type, name: c.name, cat: c.cat })),
       })),
       hand: me ? me.hand : [],
       pending: this.publicPending(playerId),
@@ -261,6 +296,10 @@ class Game {
       base.youMustPlace = true;
       base.maxIndex = this.deck.length;
     }
+    if (p.kind === 'implodePlace' && p.actorId === playerId) {
+      base.youPlaceImplode = true;
+      base.maxIndex = this.deck.length;
+    }
     if (p.kind === 'drawn' && p.actorId === playerId) {
       base.youDrew = p.card; // only the drawer sees what they drew
     }
@@ -268,6 +307,9 @@ class Game {
       base.explodeCard = p.explodeCard; // public — everyone sees the drawn Exploding Cat
       base.hasDefuse = p.hasDefuse;
       if (p.actorId === playerId) base.youExploded = true;
+    }
+    if (p.kind === 'implode') {
+      base.explodeCard = p.explodeCard; // the face-up Imploding Kitten
     }
     if (p.kind === 'stealPick') {
       const target = this.playerById(p.targetId);

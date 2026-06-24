@@ -13,11 +13,12 @@ function rnd() {
   return Math.random();
 }
 
-// Fair, publicly-derivable risk that the very next draw is an Exploding Cat.
+// Fair, publicly-derivable risk that the very next draw is fatal (Exploding or
+// Imploding Kitten).
 function explodeRisk(game) {
   const inDeck = game.deck.length;
   if (inDeck === 0) return 1;
-  const kittens = game.deck.filter((c) => c.type === 'EXPLODE').length;
+  const kittens = game.deck.filter((c) => c.type === 'EXPLODE' || c.type === 'IMPLODE').length;
   return kittens / inDeck;
 }
 
@@ -63,6 +64,10 @@ function chooseTurnAction(game, bot) {
   const alter = has('ALTER');
   const drawBottom = has('DRAW_BOTTOM');
   const peeker = future || alter; // either card lets us look at the top of the deck
+  // Expansion cards
+  const reverse = has('REVERSE');
+  const swap = has('SWAP_TB');
+  const mark = has('MARK');
 
   const top = game.deck[game.deck.length - 1];
   // Memory now holds every card seen in the last peek, so after drawing one the
@@ -71,8 +76,8 @@ function chooseTurnAction(game, bot) {
   const memValid = mem && Array.isArray(mem.known) && mem.shuffleSeq === (game.shuffleSeq || 0);
   const knownEntry = memValid && top ? mem.known.find((k) => k.id === top.id) : null;
   const knownType = knownEntry ? knownEntry.type : null;
-  const knownExplodeTop = knownType === 'EXPLODE';
-  const knownSafeTop = !!knownType && knownType !== 'EXPLODE';
+  const knownExplodeTop = knownType === 'EXPLODE' || knownType === 'IMPLODE';
+  const knownSafeTop = !!knownType && knownType !== 'EXPLODE' && knownType !== 'IMPLODE';
   // Public inference: someone peeked at the future and then dodged their draw —
   // the top is almost certainly an Exploding Cat. (Our own peek, if it says safe,
   // overrides this.)
@@ -92,9 +97,11 @@ function chooseTurnAction(game, bot) {
   // Draw From the Bottom — only useful when it's the TOP specifically that's bad.
   const dodge = (bottomOk) => {
     if (skip) return play(skip);
+    if (reverse) return play(reverse); // ends the turn like a Skip
     if (attack) return play(attack);
     if (targetedAttack && targets.length) return targetAttackOn();
     if (bottomOk && drawBottom) return play(drawBottom); // sidestep a known-bad top
+    if (bottomOk && swap) return play(swap);             // shove the bad top to the bottom
     if (shuffle) return play(shuffle); // scramble the bad top out of the way
     return null;
   };
@@ -124,6 +131,12 @@ function chooseTurnAction(game, bot) {
   if (favor && targets.length && rnd() < 0.4) {
     return { kind: 'play', cardIds: [favor.id], opts: { targetId: richest(targets).id } };
   }
+
+  // 4b. Expansion flavour: occasionally Mark the leader's hand or Swap the deck.
+  if (mark && targets.length && rnd() < 0.25) {
+    return { kind: 'play', cardIds: [mark.id], opts: { targetId: richest(targets).id } };
+  }
+  if (swap && !knownSafeTop && rnd() < 0.12) return play(swap);
 
   // 5. Don't know the top is safe and the deck is dangerous — bail out if we can.
   if (!knownSafeTop && risk > 0.35) {
@@ -160,10 +173,12 @@ function chooseFavorCard(game, bot) {
   for (const c of hand) if (c.type === 'CAT') counts[c.cat] = (counts[c.cat] || 0) + 1;
   const singleCat = hand.find((c) => c.type === 'CAT' && counts[c.cat] === 1);
   if (singleCat) return singleCat.id;
-  const meh = hand.find((c) => c.type !== 'DEFUSE' && c.type !== 'NOPE');
+  // never hand over the cards that keep you alive (or a live kitten you're holding)
+  const PRECIOUS = new Set(['DEFUSE', 'NOPE', 'STREAK', 'ZOMBIE', 'EXPLODE', 'IMPLODE']);
+  const meh = hand.find((c) => !PRECIOUS.has(c.type));
   if (meh) return meh.id;
-  const nonDefuse = hand.find((c) => c.type !== 'DEFUSE');
-  return (nonDefuse || hand[0]).id;
+  const nonVital = hand.find((c) => c.type !== 'DEFUSE' && c.type !== 'STREAK' && c.type !== 'ZOMBIE');
+  return (nonVital || hand[0]).id;
 }
 
 // Where to hide a defused Exploding Cat — often right on top, to ambush the next player.
