@@ -54,6 +54,7 @@ class RoomManager {
     const room = {
       code,
       hostId,
+      creatorId: hostId, // the one who made the room — only they may switch decks
       mode: mode === 'party' ? 'party' : 'original',
       players: [{ id: hostId, name: hostName, connected: true, avatar: cleanAvatar(avatar) }],
       game: null,
@@ -67,11 +68,11 @@ class RoomManager {
     return room;
   }
 
-  // Host switches the deck (Original / Party Pack) while still in the lobby.
+  // Only the room's creator switches the deck (Original / Party Pack) in the lobby.
   setMode(code, playerId, mode) {
     const room = this.getRoom(code);
     if (!room) return { error: 'No room with that code.' };
-    if (room.hostId !== playerId) return { error: 'Only the host can change the deck.' };
+    if (room.creatorId !== playerId) return { error: 'Only the game creator can change the deck.' };
     if (room.game) return { error: 'Cannot change the deck mid-game.' };
     const next = mode === 'party' ? 'party' : 'original';
     if (room.players.length > modeConfig(next).maxPlayers) {

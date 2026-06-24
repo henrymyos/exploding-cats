@@ -35,6 +35,7 @@ function broadcast(code) {
     hostId: room.hostId,
     started: !!room.game,
     mode: room.mode || 'original',
+    creatorId: room.creatorId || room.hostId,
     players: room.players.map((p) => ({ id: p.id, name: p.name, connected: p.connected, isBot: !!p.isBot, avatar: p.avatar || null })),
     scores: manager.scoreboard(room),
     streak: room.streak || null,

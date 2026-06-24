@@ -195,18 +195,23 @@ function renderLobby(lobby) {
   }
   renderScoreboard($('lobbyScores'), lobby);
   const isHost = lobby.hostId === PLAYER_ID;
+  const isCreator = (lobby.creatorId || lobby.hostId) === PLAYER_ID;
   const mode = lobby.mode || 'original';
   const maxForMode = mode === 'party' ? 10 : 5;
-  // deck selector: only the host can change it
-  $('modeSelect').querySelectorAll('.mode-opt').forEach((b) => {
+  // deck selector: ONLY the game's creator can change it; everyone else sees it
+  // as read-only (the chosen deck stays highlighted, but isn't tappable).
+  const modeBox = $('modeSelect');
+  modeBox.classList.toggle('readonly', !isCreator);
+  modeBox.querySelectorAll('.mode-opt').forEach((b) => {
     b.classList.toggle('on', b.dataset.mode === mode);
-    b.disabled = !isHost;
-    b.onclick = isHost ? () => {
+    b.disabled = !isCreator;
+    b.onclick = isCreator ? () => {
       socket.emit('setMode', { code: state.code, playerId: PLAYER_ID, mode: b.dataset.mode }, (res) => {
         if (res && !res.ok) toast(res.error, true);
       });
     } : null;
   });
+  $('modeHint').textContent = isCreator ? 'You pick the deck for this game.' : 'Only the game creator can change the deck.';
   const enough = lobby.players.length >= 2;
   const full = lobby.players.length >= maxForMode;
   const botCount = lobby.players.filter((p) => p.isBot).length;
