@@ -366,6 +366,10 @@ function renderGame(g, lobby) {
 
   $('drawPile').disabled = !(isMyTurn && g.phase === 'playing' && !g.pending);
 
+  // Streaking: warn if I'm secretly holding a live Exploding Kitten.
+  const holdingKitten = !!(me && me.hand && me.hand.some((c) => c.type === 'EXPLODE'));
+  $('liveKittenWarn').classList.toggle('hidden', !holdingKitten);
+
   renderHand(g, me, isMyTurn);
   renderPending(g, me);
   renderLog(g.log);

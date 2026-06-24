@@ -495,6 +495,12 @@ Game.prototype.recycleDiscard = function recycleDiscard() {
   this.deck = shuffle(this.discard.splice(0));
   this.discard = [top];
   this.shuffleSeq = (this.shuffleSeq || 0) + 1;
+  this.recycleCount += 1;
+  // Endgame escalation so Streaking/Zombie games converge: once the pile recycles
+  // the dead stay dead, and after a second lap a Streaking Kitten no longer saves
+  // you — so every lap thins the field toward a winner.
+  if (this.recycleCount === 1) this.logMsg('The draw pile recycled — the dead can no longer be revived.');
+  if (this.recycleCount === 2) this.logMsg('Second recycle — streaking no longer protects you. Sudden death!');
   this.logMsg('The draw pile ran out — the discards were shuffled back in.');
 };
 
@@ -528,8 +534,8 @@ Game.prototype.resolveDraw = function resolveDraw(player, card, noStreak) {
 
   if (card.type === 'EXPLODE') {
     // A Streaking Kitten lets you secretly keep a live Exploding Kitten instead of
-    // dying. (Expansion only.)
-    if (!noStreak && player.hand.some((c) => c.type === 'STREAK')) {
+    // dying — until the deck recycles twice (sudden death). (Expansion only.)
+    if (!noStreak && this.recycleCount < 2 && player.hand.some((c) => c.type === 'STREAK')) {
       player.hand.push(card);
       this.logMsg(`😼 ${player.name} is streaking — they pocketed an Exploding Kitten and lived!`);
       this.pending = { kind: 'drawn', actorId: player.id, card, endsAt: Date.now() + 30000 };
@@ -607,7 +613,9 @@ Game.prototype.applyExplode = function applyExplode() {
 };
 
 // Bring the longest-dead player back to life with a single Defuse to start.
+// Once the deck has recycled, the dead stay dead so the game can converge.
 Game.prototype.resurrectOne = function resurrectOne() {
+  if (this.recycleCount >= 1) return;
   while (this.deadOrder.length) {
     const id = this.deadOrder.shift();
     const p = this.playerById(id);

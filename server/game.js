@@ -46,6 +46,7 @@ class Game {
     this.turnsFromAttack = false; // are the current player's turns imposed by an Attack?
     this.direction = 1;        // turn order direction (flipped by Reverse)
     this.deadOrder = [];       // ids in death order, for Zombie resurrection
+    this.recycleCount = 0;     // times the draw pile has been recycled (endgame escalation)
     this.phase = 'playing'; // 'playing' | 'finished'
     this.winnerId = null;
     this.log = [];
@@ -231,7 +232,8 @@ class Game {
       expansions: this.expansions,
       winnerId: this.winnerId,
       deckCount: this.deck.length,
-      kittensLeft: this.deck.filter((c) => c.type === 'EXPLODE').length, // for the odds bar
+      // odds bar: Exploding Kittens + any face-up Imploding Kitten (also fatal)
+      kittensLeft: this.deck.filter((c) => c.type === 'EXPLODE' || (c.type === 'IMPLODE' && c.revealed)).length,
       discardTop: this.discard.length ? this.discard[this.discard.length - 1] : null,
       discardCount: this.discard.length,
       turnPlayerId: this.currentPlayer() ? this.currentPlayer().id : null,
