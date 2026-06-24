@@ -202,9 +202,14 @@ Game.prototype.resolveAction = function resolveAction() {
     case 'ATTACK': {
       if (this.turnPeeked && topNow) this.suspectTopId = topNow.id;
       this.turnPeeked = false;
-      const carry = Math.max(this.turnsRemaining - 1, 0) + 2;
+      // Official rule: the next player takes the attacker's remaining ATTACK-imposed
+      // turns plus 2. A normal (non-attacked) turn contributes 0, so it stacks
+      // 2 -> 4 -> 6. (A normal player's own single turn isn't passed along.)
+      const imposed = this.turnsFromAttack ? this.turnsRemaining : 0;
+      const carry = imposed + 2;
       this.nextAlive(1);
       this.turnsRemaining = carry;
+      this.turnsFromAttack = true;
       this.logMsg(`${this.currentPlayer().name} must take ${carry} turns!`);
       break;
     }
@@ -433,6 +438,7 @@ Game.prototype.applyExplode = function applyExplode() {
     player.alive = false;
     this.logMsg(`💥 ${player.name} exploded! They are out — their cards go to the discard pile.`);
     this.turnsRemaining = 1;
+    this.turnsFromAttack = false; // exploded player's attack-turns die with them
     this.nextAlive(1);
     this.pending = null;
     this.checkWin();

@@ -38,6 +38,7 @@ class Game {
     // first turn is random, not always the game's creator
     this.turnIndex = Math.floor(Math.random() * this.players.length);
     this.turnsRemaining = 1; // how many draws current player still owes (Attack stacks this)
+    this.turnsFromAttack = false; // are the current player's turns imposed by an Attack?
     this.phase = 'playing'; // 'playing' | 'finished'
     this.winnerId = null;
     this.log = [];
@@ -154,6 +155,7 @@ class Game {
     }
     this.nextAlive(1);
     this.turnsRemaining = 1;
+    this.turnsFromAttack = false; // a fresh normal turn for the next player
   }
 
   nextAlive(step) {
