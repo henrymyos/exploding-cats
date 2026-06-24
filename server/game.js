@@ -1,6 +1,6 @@
 'use strict';
 
-const { CARD_DEFS, MODES, modeConfig, catList } = require('./cards');
+const { CARD_DEFS, MODES, resolveDeck, catList } = require('./cards');
 
 let cardSeq = 0;
 function makeCard(props) {
@@ -25,7 +25,8 @@ class Game {
   constructor(playerList, mode) {
     // playerList: [{ id, name, isBot? }]; mode: 'original' | 'party'
     this.mode = MODES[mode] ? mode : 'original';
-    this.cfg = modeConfig(this.mode);
+    // deck composition depends on the mode AND player count (Party Pack scales)
+    this.cfg = resolveDeck(this.mode, playerList.length);
     this.players = playerList.map((p) => ({
       id: p.id,
       name: p.name,

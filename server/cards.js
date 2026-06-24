@@ -40,41 +40,64 @@ const CARD_DEFS = {
 };
 
 // ---- Per-mode deck composition. ----
-// explodePool = how many Exploding Kittens exist in the box (setup uses players-1).
-// defuse      = total Defuse cards (one dealt to each player, the rest seeded back).
-// catCount    = copies of each of the five collectible cats.
-// feral       = copies of the wild Feral Cat (party only).
-// actions     = count of each playable action card type in the deck.
+// A count map uses DEFUSE / CAT (copies per cat type) / FERAL plus action types.
+// EXPLODE is seeded separately at (players - 1).
 const MODES = {
   original: {
     label: 'Original',
     maxPlayers: 5,
-    explodePool: 4,
-    defuse: 6,
-    catCount: 4,
-    feral: 0,
-    actions: { NOPE: 5, ATTACK: 4, SKIP: 4, FAVOR: 4, SHUFFLE: 4, FUTURE: 5 },
+    // Standard 56-card deck, fixed regardless of player count (2-5).
+    counts: { DEFUSE: 6, CAT: 4, NOPE: 5, ATTACK: 4, SKIP: 4, FAVOR: 4, SHUFFLE: 4, FUTURE: 5 },
   },
   party: {
     label: 'Party Pack',
     maxPlayers: 10,
-    explodePool: 9,
-    defuse: 10,
-    catCount: 6,
-    feral: 6,
-    actions: {
-      NOPE: 10, ATTACK: 5, TARGETED_ATTACK: 5, SKIP: 8, FAVOR: 6,
-      SHUFFLE: 6, FUTURE: 6, ALTER: 6, DRAW_BOTTOM: 7,
-    },
+    // The box scales with player count via paw-print subsets:
+    //   2-3 players -> paw cards only; 4-7 -> non-paw only; 8-10 -> all cards.
+    paw:    { DEFUSE: 3, CAT: 3, FERAL: 2, NOPE: 3, ATTACK: 2, TARGETED_ATTACK: 2, SKIP: 4, FAVOR: 2, SHUFFLE: 2, FUTURE: 3, ALTER: 2, DRAW_BOTTOM: 3 },
+    nonPaw: { DEFUSE: 7, CAT: 4, FERAL: 4, NOPE: 7, ATTACK: 3, TARGETED_ATTACK: 3, SKIP: 6, FAVOR: 4, SHUFFLE: 4, FUTURE: 3, ALTER: 4, DRAW_BOTTOM: 4 },
   },
 };
 
+// Lightweight per-mode info for the lobby (seat cap + label).
 function modeConfig(mode) {
-  return MODES[mode] || MODES.original;
+  const m = MODES[mode] || MODES.original;
+  return { maxPlayers: m.maxPlayers, label: m.label };
+}
+
+// Resolve the actual deck composition for a mode + player count. Party Pack
+// scales in three tiers like the physical box; Original is fixed.
+function resolveDeck(mode, players) {
+  const isParty = mode === 'party' && MODES.party;
+  let counts;
+  if (isParty) {
+    const n = Math.max(2, Math.min(players || 5, 10));
+    if (n <= 3) counts = { ...MODES.party.paw };
+    else if (n <= 7) counts = { ...MODES.party.nonPaw };
+    else {
+      counts = {};
+      const keys = new Set([...Object.keys(MODES.party.paw), ...Object.keys(MODES.party.nonPaw)]);
+      keys.forEach((k) => { counts[k] = (MODES.party.paw[k] || 0) + (MODES.party.nonPaw[k] || 0); });
+    }
+  } else {
+    counts = { ...MODES.original.counts };
+  }
+  const actions = {};
+  for (const k of Object.keys(counts)) {
+    if (k === 'DEFUSE' || k === 'CAT' || k === 'FERAL') continue;
+    actions[k] = counts[k];
+  }
+  return {
+    defuse: counts.DEFUSE || 0,
+    catCount: counts.CAT || 0,
+    feral: counts.FERAL || 0,
+    explodePool: 9, // setup uses (players - 1); the box never needs more than 9
+    actions,
+  };
 }
 
 function catList() {
   return CATS.map((c) => ({ ...c }));
 }
 
-module.exports = { CATS, CARD_DEFS, MODES, modeConfig, catList };
+module.exports = { CATS, CARD_DEFS, MODES, modeConfig, resolveDeck, catList };
