@@ -231,6 +231,7 @@ class Game {
       expansions: this.expansions,
       winnerId: this.winnerId,
       deckCount: this.deck.length,
+      kittensLeft: this.deck.filter((c) => c.type === 'EXPLODE').length, // for the odds bar
       discardTop: this.discard.length ? this.discard[this.discard.length - 1] : null,
       discardCount: this.discard.length,
       turnPlayerId: this.currentPlayer() ? this.currentPlayer().id : null,

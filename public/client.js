@@ -338,6 +338,7 @@ function renderGame(g, lobby) {
 
   $('deckCount').textContent = g.deckCount;
   $('deckLeft').textContent = g.deckCount;
+  renderOdds(g);
   const dt = $('discardTop');
   if (g.discardTop) {
     dt.className = 'card-mini';
@@ -376,6 +377,26 @@ function renderGame(g, lobby) {
   handleTurnChime(g);
   if (g.phase === 'finished') showVictory(g, lobby);
   else hideVictory();
+}
+
+// Odds bar: chance the next drawn card is an Exploding Kitten, from the public
+// kitten count and deck size. Colours green -> yellow -> red as it climbs.
+function renderOdds(g) {
+  const bar = $('oddsBar');
+  const n = g.deckCount || 0;
+  const k = g.kittensLeft || 0;
+  if (g.phase !== 'playing' || n <= 0) { bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  const risk = Math.min(1, k / n);
+  // hue 120 (green) at 0 risk -> 60 (yellow) at 25% -> 0 (red) at 50%+
+  const hue = Math.round(120 * (1 - Math.min(risk / 0.5, 1)));
+  const color = `hsl(${hue}, 85%, 52%)`;
+  $('oddsFill').style.width = (k > 0 ? Math.max(risk * 100, 3) : 0) + '%';
+  $('oddsFill').style.backgroundColor = color;
+  const pct = risk * 100;
+  const pctStr = pct >= 9.95 ? Math.round(pct) + '%' : pct.toFixed(1) + '%';
+  $('oddsText').style.color = color;
+  $('oddsText').textContent = k > 0 ? `💥 ${pctStr} · ${k} in ${n}` : '💥 0% — no kittens left';
 }
 
 // Lay the opponents out along a downward-opening arc (a semicircle around the
