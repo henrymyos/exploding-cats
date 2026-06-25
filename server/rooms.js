@@ -259,6 +259,7 @@ class RoomManager {
     else if (kind === 'drawn') game.continueTurnAuto();
     else if (kind === 'explode') game.applyExplode();
     else if (kind === 'stealPick') game.stealAuto();
+    else if (kind === 'markPick') game.markAuto();
     else if (kind === 'alter') game.alterAuto();
     else if (kind === 'implodePlace') game.implodePlaceAuto();
     else if (kind === 'implode') game.applyImplode();
@@ -385,6 +386,10 @@ class RoomManager {
       room.botTimer = setTimeout(() => this.runBotJob(room, 'steal', p.actorId), rand(700, 1300));
       return;
     }
+    if (p && p.kind === 'markPick' && this.isBot(g, p.actorId)) {
+      room.botTimer = setTimeout(() => this.runBotJob(room, 'mark', p.actorId), rand(700, 1300));
+      return;
+    }
     if (!p) {
       const cur = g.currentPlayer();
       if (cur && isBotSeat(cur) && cur.alive) {
@@ -454,6 +459,12 @@ class RoomManager {
         const target = g.playerById(p.targetId);
         const n = target ? target.hand.length : 0;
         g.stealTake(botId, n ? Math.floor(Math.random() * n) : 0);
+      }
+    } else if (type === 'mark') {
+      if (p && p.kind === 'markPick' && p.actorId === botId) {
+        const target = g.playerById(p.targetId);
+        const hidden = target ? target.hand.filter((c) => !c.marked) : [];
+        g.markTake(botId, hidden.length ? Math.floor(Math.random() * hidden.length) : 0);
       }
     } else if (type === 'turn') {
       if (!p && g.currentPlayer() && g.currentPlayer().id === botId) {

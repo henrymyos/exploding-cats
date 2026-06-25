@@ -48,28 +48,6 @@ function findCatPair(hand) {
   return null;
 }
 
-// Find three cards for a named-demand combo (cats matching, Ferals wild).
-function findCatTrio(hand) {
-  const byCat = {};
-  const ferals = [];
-  for (const c of hand) {
-    if (c.type === 'FERAL') ferals.push(c.id);
-    else if (c.type === 'CAT') (byCat[c.cat] = byCat[c.cat] || []).push(c.id);
-  }
-  for (const cat of Object.keys(byCat)) {
-    const need = byCat[cat].concat(ferals);
-    if (byCat[cat].length >= 1 && need.length >= 3) return need.slice(0, 3);
-  }
-  if (ferals.length >= 3) return ferals.slice(0, 3);
-  return null;
-}
-
-// A live opponent publicly known to be holding a kitten via a Streaking Kitten
-// (whenever someone streaks it's announced, so this is fair information).
-function streakingTarget(game, bot) {
-  return game.players.find((p) => p.alive && p.id !== bot.id && p.hand.some((c) => c.type === 'EXPLODE'));
-}
-
 // What the bot wants to do on its own turn — one action per call.
 function chooseTurnAction(game, bot) {
   const hand = bot.hand;
@@ -143,20 +121,10 @@ function chooseTurnAction(game, bot) {
     return play(peeker);
   }
 
-  // 3a. A rival is streaking a live kitten — if we can demand their Streaking
-  //     Kitten with a three-of-a-kind, do it: they lose the streak and explode.
-  const streaker = streakingTarget(game, bot);
-  if (streaker) {
-    const trio = findCatTrio(hand);
-    if (trio) return { kind: 'play', cardIds: trio, opts: { targetId: streaker.id, namedType: 'STREAK' } };
-  }
-
-  // 3. Cash in a matching cat pair to steal. Prefer a streaking rival (a blind
-  //    steal might grab their Streaking Kitten and pop them).
+  // 3. Cash in a matching cat pair to steal a random card from the richest rival.
   const pair = findCatPair(hand);
   if (pair && targets.length && rnd() < 0.6) {
-    const tgt = streaker || richest(targets);
-    return { kind: 'play', cardIds: pair, opts: { targetId: tgt.id } };
+    return { kind: 'play', cardIds: pair, opts: { targetId: richest(targets).id } };
   }
 
   // 4. Beg a card sometimes.

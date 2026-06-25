@@ -320,13 +320,12 @@ function renderGame(g, lobby) {
     const marked = (p.marked && p.marked.length)
       ? `<div class="opp-marked" title="Flipped face-up by a Mark card">${p.marked.map(markFace).join('')}</div>`
       : '';
-    const streak = p.streaking ? `<div class="opp-streak">🙀 holding a kitten!</div>` : '';
+    // (Streaking a live kitten is secret — opponents show no "holding a kitten" tag.)
     div.innerHTML =
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
       marked +
       `<div class="opp-fan">${fan}</div>` +
-      `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>` +
-      streak;
+      `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
     if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
     keepIds.add(p.id);
   });
@@ -1053,6 +1052,13 @@ function renderPending(g, me) {
     closeOverlay();
   }
 
+  // Mark: I pick a face-down card from the target's hand to flip face-up
+  if (p.kind === 'markPick' && p.youMark) {
+    showMarkPick(p);
+  } else if (overlayMode === 'mark') {
+    closeOverlay();
+  }
+
   // Draw reveal: I just drew a card — show it big, then Continue ends my turn.
   if (p.kind === 'drawn') {
     if (p.youDrew) showDrawReveal(p.youDrew);
@@ -1238,6 +1244,29 @@ function showStealPick(p) {
   $('overlayBox').querySelectorAll('.pick-back').forEach((btn) => {
     btn.onclick = () => {
       socket.emit('stealTake', { code: state.code, playerId: PLAYER_ID, index: Number(btn.dataset.i) }, (res) => {
+        if (!res.ok) toast(res.error, true);
+      });
+      closeOverlay();
+    };
+  });
+}
+
+// Mark: show the target's face-down hand and pick one to flip face-up for all.
+function showMarkPick(p) {
+  if (overlayMode === 'mark') return;
+  overlayMode = 'mark';
+  const n = Math.max(p.markCount || 0, 0);
+  let backs = '';
+  for (let i = 0; i < n; i += 1) backs += `<button class="pick-back" data-i="${i}" title="Flip this card face-up"></button>`;
+  openOverlay(
+    `<h2>🔖 Mark a card</h2>` +
+    `<p class="hint">Pick one of ${escapeHtml(p.targetName)}'s face-down cards to flip face-up for everyone.</p>` +
+    `<div class="pick-fan">${backs}</div>`,
+    true
+  );
+  $('overlayBox').querySelectorAll('.pick-back').forEach((btn) => {
+    btn.onclick = () => {
+      socket.emit('markTake', { code: state.code, playerId: PLAYER_ID, index: Number(btn.dataset.i) }, (res) => {
         if (!res.ok) toast(res.error, true);
       });
       closeOverlay();

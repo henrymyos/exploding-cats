@@ -267,8 +267,9 @@ class Game {
         handCount: p.hand.length,
         // Mark (Streaking Kittens) flips cards face-up for everyone to see.
         marked: p.hand.filter((c) => c.marked).map((c) => ({ id: c.id, type: c.type, name: c.name, cat: c.cat })),
-        // Streaking a live Exploding Kitten is announced publicly when it happens.
-        streaking: p.hand.some((c) => c.type === 'EXPLODE'),
+        // Streaking a live Exploding Kitten is SECRET — only the holder ever knows
+        // they're sitting on one; to everyone else it looks like a normal hand.
+        streaking: p.id === playerId ? p.hand.some((c) => c.type === 'EXPLODE') : false,
       })),
       hand: me ? me.hand : [],
       pending: this.publicPending(playerId),
@@ -342,6 +343,13 @@ class Game {
       base.targetName = target ? target.name : '';
       base.stealCount = target ? target.hand.length : 0; // face-down cards to pick from
       if (p.actorId === playerId) base.youSteal = true;
+    }
+    if (p.kind === 'markPick') {
+      const target = this.playerById(p.targetId);
+      base.targetName = target ? target.name : '';
+      // only the still-face-down cards can be flipped
+      base.markCount = target ? target.hand.filter((c) => !c.marked).length : 0;
+      if (p.actorId === playerId) base.youMark = true;
     }
     if (p.kind === 'stealPick' && p.targetId === playerId && p.mode === 'named') {
       // target doesn't choose for named steal; nothing extra

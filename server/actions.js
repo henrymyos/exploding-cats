@@ -362,7 +362,8 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
   }
 };
 
-// Mark: flip a random card in the target's hand face-up so everyone can see it.
+// Mark: the actor blind-picks one of the target's face-down cards (like a steal),
+// and that card is flipped face-up for everyone for the rest of the game.
 Game.prototype.resolveMark = function resolveMark(actor, a) {
   const target = this.playerById(a.targetId);
   if (!target || !target.alive || target.hand.length === 0) {
@@ -371,9 +372,39 @@ Game.prototype.resolveMark = function resolveMark(actor, a) {
   }
   const hidden = target.hand.filter((c) => !c.marked);
   if (!hidden.length) { this.logMsg(`${target.name}'s hand is already all marked.`); return; }
-  const card = hidden[Math.floor(Math.random() * hidden.length)];
+  this.pending = {
+    kind: 'markPick',
+    actorId: actor.id,
+    targetId: target.id,
+    endsAt: Date.now() + 20000,
+    description: `${actor.name} is choosing a card to flip face-up in ${target.name}'s hand.`,
+  };
+};
+
+// The actor flips a chosen face-down card in the target's hand face-up.
+Game.prototype.markTake = function markTake(playerId, index) {
+  if (!this.pending || this.pending.kind !== 'markPick') return err('No mark to resolve.');
+  if (this.pending.actorId !== playerId) return err('Not your mark.');
+  const actor = this.playerById(this.pending.actorId);
+  const target = this.playerById(this.pending.targetId);
+  const hidden = target ? target.hand.filter((c) => !c.marked) : [];
+  if (!hidden.length) { this.pending = null; this.checkWin(); return ok(); }
+  let i = Number.isInteger(index) ? index : Math.floor(Math.random() * hidden.length);
+  i = Math.max(0, Math.min(i, hidden.length - 1));
+  const card = hidden[i];
   card.marked = true; // stays revealed to everyone for the rest of the game
-  this.logMsg(`🔖 ${actor.name} marked ${target.name}'s ${card.name} — now face-up for all to see.`);
+  this.logMsg(`🔖 ${actor.name} flipped ${target.name}'s ${card.name} face-up for all to see.`);
+  this.pending = null;
+  this.checkWin();
+  return ok();
+};
+
+Game.prototype.markAuto = function markAuto() {
+  if (this.pending && this.pending.kind === 'markPick') {
+    const target = this.playerById(this.pending.targetId);
+    const hidden = target ? target.hand.filter((c) => !c.marked) : [];
+    this.markTake(this.pending.actorId, hidden.length ? Math.floor(Math.random() * hidden.length) : 0);
+  }
 };
 
 // Note the most recent card-take so both players can be shown which card moved.
@@ -540,8 +571,10 @@ Game.prototype.resolveDraw = function resolveDraw(player, card, noStreak) {
     // dying — until the deck recycles twice (sudden death). (Expansion only.)
     if (!noStreak && this.recycleCount < 2 && player.hand.some((c) => c.type === 'STREAK')) {
       player.hand.push(card);
-      this.logMsg(`😼 ${player.name} is streaking — they pocketed an Exploding Kitten and lived!`);
-      this.pending = { kind: 'drawn', actorId: player.id, card, endsAt: Date.now() + 30000 };
+      // Kept SECRET: no public log. To the table this is an ordinary draw; only
+      // the holder sees (in their private draw reveal) that it's a live kitten.
+      this.logMsg(`${player.name} drew a card.`);
+      this.pending = { kind: 'drawn', actorId: player.id, card, streaked: true, endsAt: Date.now() + 30000 };
       return ok({ exploded: false, card, streaked: true });
     }
     // Reveal the Exploding Kitten to everyone first (dramatic pause), then resolve.
