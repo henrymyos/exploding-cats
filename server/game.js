@@ -262,6 +262,7 @@ class Game {
       discardPile: this.discard.slice().reverse().map((c) => ({ type: c.type, name: c.name, cat: c.cat })),
       turnPlayerId: this.currentPlayer() ? this.currentPlayer().id : null,
       turnsRemaining: this.turnsRemaining,
+      direction: this.direction, // turn order (1 = normal, -1 = reversed by a Reverse card)
       players: this.players.map((p) => ({
         id: p.id,
         name: p.name,

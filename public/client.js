@@ -342,6 +342,7 @@ function renderGame(g, lobby) {
   $('deckCount').textContent = g.deckCount;
   $('deckLeft').textContent = g.deckCount;
   renderOdds(g);
+  renderTurnDir(g);
   const dt = $('discardTop');
   if (g.discardTop) {
     dt.className = 'card-mini';
@@ -404,6 +405,37 @@ function renderOdds(g) {
   const pctStr = pct >= 9.95 ? Math.round(pct) + '%' : pct.toFixed(1) + '%';
   $('oddsText').style.color = color;
   $('oddsText').textContent = k > 0 ? `💥 ${pctStr} · ${k} in ${n}` : '💥 0% — no kittens left';
+}
+
+// Whose seat plays next, following the current turn direction (skipping the dead).
+// A player still owing turns from an Attack goes again before the order moves on.
+function nextUpPlayer(g) {
+  const n = g.players.length;
+  const cur = g.players.findIndex((p) => p.id === g.turnPlayerId);
+  if (cur < 0) return null;
+  if ((g.turnsRemaining || 1) > 1) return g.players[cur]; // attacked: same player again
+  const step = g.direction === -1 ? -1 : 1;
+  for (let s = 1; s <= n; s += 1) {
+    const p = g.players[(cur + step * s + n * n) % n];
+    if (p && p.alive) return p;
+  }
+  return null;
+}
+
+// Turn-direction indicator — only meaningful when Reverse can be played, i.e. the
+// Imploding Kittens expansion (which ships the Reverse card) is enabled.
+function renderTurnDir(g) {
+  const el = $('turnDir');
+  const hasReverse = Array.isArray(g.expansions) && g.expansions.includes('imploding');
+  if (!hasReverse || g.phase !== 'playing') { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  const reversed = g.direction === -1;
+  el.classList.toggle('reversed', reversed);
+  const next = nextUpPlayer(g);
+  const arrow = reversed ? '↺' : '↻';
+  const nextName = next ? (next.id === PLAYER_ID ? 'you' : next.name) : '—';
+  el.innerHTML = `<span class="td-arrow">${arrow}</span>` +
+    `<span class="td-text">${reversed ? 'Reversed' : 'Turn order'} · next: ${escapeHtml(nextName)}</span>`;
 }
 
 // Lay the opponents out along a downward-opening arc (a semicircle around the

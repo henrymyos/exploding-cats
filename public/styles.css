@@ -347,6 +347,16 @@ h1 { font-size: 2rem; margin: 0; }
   overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
 .odds-fill { height: 100%; width: 0; border-radius: 6px; transition: width .35s ease, background-color .35s ease; }
 .odds-text { font-size: .68rem; font-weight: 700; letter-spacing: .3px; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.6); }
+/* Turn-direction indicator (only shown when Reverse is in play). */
+.turn-dir { display: inline-flex; align-items: center; gap: 5px; margin-bottom: 8px; padding: 3px 10px;
+  border-radius: 999px; font-size: .7rem; font-weight: 700; white-space: nowrap;
+  background: rgba(255,255,255,.08); color: var(--muted); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
+.turn-dir.hidden { display: none; }
+.turn-dir .td-arrow { font-size: 1rem; line-height: 1; }
+.turn-dir.reversed { background: rgba(255,122,107,.18); color: #ff9f93; box-shadow: inset 0 0 0 1px rgba(255,122,107,.45); }
+.turn-dir.reversed .td-arrow { animation: dirflip .5s ease; }
+@keyframes dirflip { from { transform: rotate(180deg) scale(1.3); } to { transform: rotate(0) scale(1); } }
+
 .pile { background: none; border: none; cursor: pointer; text-align: center; color: var(--text); }
 
 /* Discard-pile viewer: grouped cards with counts, like flipping through the pile. */
