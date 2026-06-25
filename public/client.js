@@ -315,15 +315,18 @@ function renderGame(g, lobby) {
     const avEl = avById[p.id]
       ? `<span class="opp-avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>`
       : `<span class="opp-avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
+    // Mark (Streaking Kittens): a flipped card sits face-up at the TOP of the
+    // owner's hand so everyone can see exactly what it is.
     const marked = (p.marked && p.marked.length)
-      ? `<div class="opp-marked">🔖 ${p.marked.map((c) => escapeHtml(c.name)).join(', ')}</div>`
+      ? `<div class="opp-marked" title="Flipped face-up by a Mark card">${p.marked.map(markFace).join('')}</div>`
       : '';
     const streak = p.streaking ? `<div class="opp-streak">🙀 holding a kitten!</div>` : '';
     div.innerHTML =
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
+      marked +
       `<div class="opp-fan">${fan}</div>` +
       `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>` +
-      streak + marked;
+      streak;
     if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
     keepIds.add(p.id);
   });
@@ -787,7 +790,7 @@ function renderHand(g, me, isMyTurn) {
         el.dataset.type = card.type;
         el.innerHTML = cardFace(card);            // build the photo once, then keep it
       }
-      el.className = 'card' + (i > 0 ? ' fanned' : '');
+      el.className = 'card' + (i > 0 ? ' fanned' : '') + (card.marked ? ' marked' : '');
       el.style.zIndex = String(i);
       if (stack.children[i] !== el) stack.insertBefore(el, stack.children[i] || null);
       keepCardIds.add(card.id);
@@ -1504,6 +1507,19 @@ function miniFace(card) {
   return cardFace(card);
 }
 
+// A small face-up card shown at the top of an opponent's hand after a Mark
+// flips it — the photo, the name, and a bookmark tag, so everyone can read it.
+// Carries data-type so the press-and-hold / hover tooltip works on it too.
+function markFace(card) {
+  return (
+    `<div class="mark-card" data-type="${card.type}">` +
+      `<span class="mark-flag">🔖</span>` +
+      `<div class="mark-art" style="background-image:url('${photoFor(card)}')"></div>` +
+      `<span class="card-name mark-name">${escapeHtml(card.name)}</span>` +
+    `</div>`
+  );
+}
+
 /* ---------------- card tooltips (hover / press-and-hold) ---------------- */
 const CARD_DESC = {
   EXPLODE: 'Draw one and you’re out — unless you can defuse it.',
@@ -1550,14 +1566,14 @@ function hideCardTip() { $('cardTip').classList.add('hidden'); }
 // Desktop: hover. Mobile: press-and-hold (without triggering the tap-to-select).
 let tipPressTimer = null, tipSwallowClick = false;
 document.addEventListener('mouseover', (e) => {
-  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type]');
+  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type]');
   if (card) showCardTip(card);
 });
 document.addEventListener('mouseout', (e) => {
-  if (e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type]')) hideCardTip();
+  if (e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type]')) hideCardTip();
 });
 document.addEventListener('touchstart', (e) => {
-  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type]');
+  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type]');
   if (!card) return;
   clearTimeout(tipPressTimer);
   tipPressTimer = setTimeout(() => { tipSwallowClick = true; showCardTip(card); }, 380);

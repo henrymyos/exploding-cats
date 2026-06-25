@@ -266,7 +266,7 @@ class Game {
         alive: p.alive,
         handCount: p.hand.length,
         // Mark (Streaking Kittens) flips cards face-up for everyone to see.
-        marked: p.hand.filter((c) => c.marked).map((c) => ({ type: c.type, name: c.name, cat: c.cat })),
+        marked: p.hand.filter((c) => c.marked).map((c) => ({ id: c.id, type: c.type, name: c.name, cat: c.cat })),
         // Streaking a live Exploding Kitten is announced publicly when it happens.
         streaking: p.hand.some((c) => c.type === 'EXPLODE'),
       })),
