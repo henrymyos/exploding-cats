@@ -224,6 +224,23 @@ class Game {
 
   // ---------- per-player view (hides other hands & the deck order) ----------
 
+  // Kittens a given player should believe could be on top of the draw pile:
+  // the ones actually in the deck, plus live Exploding Kittens hidden in OTHER
+  // players' hands (via a Streaking Kitten) that this viewer can't see and so
+  // would assume are still in the deck. The streaking holder sees their own and
+  // so doesn't double-count it.
+  kittensLeftFor(playerId) {
+    const inDeck = this.deck.filter(
+      (c) => c.type === 'EXPLODE' || (c.type === 'IMPLODE' && c.revealed)
+    ).length;
+    let hiddenInOtherHands = 0;
+    for (const p of this.players) {
+      if (p.id === playerId) continue;
+      hiddenInOtherHands += p.hand.filter((c) => c.type === 'EXPLODE').length;
+    }
+    return inDeck + hiddenInOtherHands;
+  }
+
   snapshotFor(playerId) {
     const me = this.playerById(playerId);
     return {
@@ -232,8 +249,12 @@ class Game {
       expansions: this.expansions,
       winnerId: this.winnerId,
       deckCount: this.deck.length,
-      // odds bar: Exploding Kittens + any face-up Imploding Kitten (also fatal)
-      kittensLeft: this.deck.filter((c) => c.type === 'EXPLODE' || (c.type === 'IMPLODE' && c.revealed)).length,
+      // Odds bar: chance the next deck card is fatal, from THIS player's vantage.
+      // It's the kittens genuinely in the deck (Exploding + any face-up Imploding)
+      // PLUS any live kitten a Streaking Kitten is hiding in someone else's hand —
+      // the viewer can't see those, so to them they might still be in the deck.
+      // The player streaking the kitten sees their own and so counts it out.
+      kittensLeft: this.kittensLeftFor(playerId),
       discardTop: this.discard.length ? this.discard[this.discard.length - 1] : null,
       discardCount: this.discard.length,
       turnPlayerId: this.currentPlayer() ? this.currentPlayer().id : null,
