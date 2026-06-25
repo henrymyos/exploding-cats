@@ -257,6 +257,9 @@ class Game {
       kittensLeft: this.kittensLeftFor(playerId),
       discardTop: this.discard.length ? this.discard[this.discard.length - 1] : null,
       discardCount: this.discard.length,
+      // The discard pile is face-up and public — players may look through it to
+      // count what's already been played (newest first).
+      discardPile: this.discard.slice().reverse().map((c) => ({ type: c.type, name: c.name, cat: c.cat })),
       turnPlayerId: this.currentPlayer() ? this.currentPlayer().id : null,
       turnsRemaining: this.turnsRemaining,
       players: this.players.map((p) => ({

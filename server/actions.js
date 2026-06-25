@@ -510,8 +510,9 @@ Game.prototype.drawCard = function drawCard(playerId) {
     // the game terminating. Otherwise recycle the discard so play continues.
     const live = player.hand.find((c) => c.type === 'EXPLODE');
     if (live) {
+      // Pile's empty and they're secretly sitting on a live kitten — it catches up
+      // with them. The explosion below announces itself; don't pre-leak the streak.
       this.removeCardFromHand(player, live.id);
-      this.logMsg(`${player.name}'s streak ended — the draw pile is empty.`);
       return this.resolveDraw(player, live, true); // no streak save this time
     }
     this.recycleDiscard();
@@ -530,12 +531,17 @@ Game.prototype.recycleDiscard = function recycleDiscard() {
   this.discard = [top];
   this.shuffleSeq = (this.shuffleSeq || 0) + 1;
   this.recycleCount += 1;
+  this.logMsg('The draw pile ran out — the discards were shuffled back in.');
   // Endgame escalation so Streaking/Zombie games converge: once the pile recycles
   // the dead stay dead, and after a second lap a Streaking Kitten no longer saves
-  // you — so every lap thins the field toward a winner.
-  if (this.recycleCount === 1) this.logMsg('The draw pile recycled — the dead can no longer be revived.');
-  if (this.recycleCount === 2) this.logMsg('Second recycle — streaking no longer protects you. Sudden death!');
-  this.logMsg('The draw pile ran out — the discards were shuffled back in.');
+  // you — so every lap thins the field toward a winner. Only mention the rule that
+  // an enabled expansion actually changes (otherwise it's confusing noise).
+  if (this.recycleCount === 1 && this.hasExp('zombie')) {
+    this.logMsg('With the pile recycled, the dead can no longer be revived.');
+  }
+  if (this.recycleCount === 2 && this.hasExp('streaking')) {
+    this.logMsg('Second recycle — streaking no longer protects you. Sudden death!');
+  }
 };
 
 // Apply a freshly-drawn card (from the top or, for Draw From the Bottom, the

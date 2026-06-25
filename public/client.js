@@ -1274,6 +1274,39 @@ function showMarkPick(p) {
   });
 }
 
+// Look through the (public, face-up) discard pile — grouped by card with counts,
+// so you can see what's already been played, just like flipping through it in person.
+function showDiscardPile() {
+  const g = state.game;
+  const pile = (g && g.discardPile) || [];
+  overlayMode = 'discard';
+  if (!pile.length) {
+    openOverlay(`<h2>🗑️ Discard pile</h2><p class="hint">Nothing's been played yet.</p>`);
+    return;
+  }
+  // group identical cards (cats keyed by their cat) and keep them in play order
+  const groups = [];
+  const byKey = {};
+  pile.forEach((c) => {
+    const key = c.type === 'CAT' ? `CAT:${c.cat}` : c.type;
+    if (!byKey[key]) { byKey[key] = { card: c, count: 0 }; groups.push(byKey[key]); }
+    byKey[key].count += 1;
+  });
+  groups.sort((a, b) => b.count - a.count);
+  const chips = groups.map((grp) =>
+    `<div class="discard-chip" data-type="${grp.card.type}">` +
+      `<div class="dc-art" style="background-image:url('${photoFor(grp.card)}')"></div>` +
+      `<span class="dc-name">${escapeHtml(grp.card.name)}</span>` +
+      `<span class="dc-count">×${grp.count}</span>` +
+    `</div>`
+  ).join('');
+  openOverlay(
+    `<h2>🗑️ Discard pile (${pile.length})</h2>` +
+    `<p class="hint">Every card that's been played so far.</p>` +
+    `<div class="discard-view">${chips}</div>`
+  );
+}
+
 function showDefuse(maxIndex, isImplode) {
   if (overlayMode === 'defuse') return;
   overlayMode = 'defuse';
@@ -1324,6 +1357,9 @@ function closeOverlay() {
 $('overlay').onclick = (e) => {
   if (e.target.id === 'overlay' && !$('overlay')._sticky) closeOverlay();
 };
+
+// Tap the discard pile to look through everything that's been played.
+$('discardPile').onclick = () => showDiscardPile();
 
 /* ---------------- game menu (leave / end) ---------------- */
 function goHome() {
@@ -1595,14 +1631,14 @@ function hideCardTip() { $('cardTip').classList.add('hidden'); }
 // Desktop: hover. Mobile: press-and-hold (without triggering the tap-to-select).
 let tipPressTimer = null, tipSwallowClick = false;
 document.addEventListener('mouseover', (e) => {
-  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type]');
+  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]');
   if (card) showCardTip(card);
 });
 document.addEventListener('mouseout', (e) => {
-  if (e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type]')) hideCardTip();
+  if (e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]')) hideCardTip();
 });
 document.addEventListener('touchstart', (e) => {
-  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type]');
+  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]');
   if (!card) return;
   clearTimeout(tipPressTimer);
   tipPressTimer = setTimeout(() => { tipSwallowClick = true; showCardTip(card); }, 380);
