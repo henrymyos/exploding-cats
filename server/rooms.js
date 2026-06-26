@@ -16,11 +16,14 @@ function maxPlayers(room) {
 const BOT_NAMES = ['Whiskers Bot', 'Mittens Bot', 'Felix Bot', 'Smokey Bot', 'Tiger Bot',
   'Luna Bot', 'Oreo Bot', 'Shadow Bot', 'Ziggy Bot'];
 const CAT_IDS = catList().map((c) => c.id);
+// Avatars a player may choose: the cats, plus Stella the dog. (Bots are only
+// ever assigned cats, below.)
+const AVATAR_IDS = new Set([...CAT_IDS, 'stella']);
 const REACTION_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];
 
-// Validate an avatar choice (must be one of our cats); returns null if invalid.
+// Validate an avatar choice (a cat, or Stella); returns null if invalid.
 function cleanAvatar(avatar) {
-  return CAT_IDS.includes(avatar) ? avatar : null;
+  return AVATAR_IDS.has(avatar) ? avatar : null;
 }
 
 function randomCode() {
