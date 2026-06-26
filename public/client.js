@@ -1555,7 +1555,13 @@ const ALL_PHOTOS = Object.values(CAT_PHOTOS).reduce((a, list) => a.concat(list),
 
 // Each action card TYPE owns an exclusive set of photos: a photo assigned to one
 // type never backs another, so e.g. an Attack photo can't also appear on Skip or
-// Favor. (These 16 entries cover every photo exactly once.)
+// Favor. (The cat types cover every cat photo exactly once.) The Feral Cat — the
+// wild card — is the odd one out: it's backed by photos of Stella the dog.
+const STELLA_PHOTOS = [
+  'stella.png', 'stella2.png', 'stella3.png', 'stella4.png', 'stella5.png',
+  'stella6.png', 'stella7.png', 'stella8.png', 'stella9.png', 'stella10.png',
+  'stella11.png', 'stella12.png', 'stella13.png', 'stella14.png', 'stella15.png',
+];
 const ACTION_PHOTOS = {
   EXPLODE:  ['gambit.png', 'gambit2.png'],
   DEFUSE:   ['max.png', 'max2.png'],
@@ -1569,6 +1575,7 @@ const ACTION_PHOTOS = {
   TARGETED_ATTACK: ['loki.png', 'loki2.png'],
   ALTER:           ['loki3.png', 'genevieve3.png'],
   DRAW_BOTTOM:     ['pepper3.png', 'gambit3.png'],
+  FERAL:           STELLA_PHOTOS, // the wild card is our dog, Stella
   // Expansion types
   IMPLODE:         ['gambit.png', 'gambit2.png'],
   REVERSE:         ['pepper.png', 'pepper2.png'],

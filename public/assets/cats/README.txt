@@ -21,3 +21,9 @@ nowhere else — just keep id and filename in sync).
 
 Until you add photos, the cards show a 🐈 emoji as a placeholder, so the game is
 fully playable right now.
+
+THE FERAL CAT (Party Pack wild card)
+====================================
+The Feral Cat is backed by photos of Stella the dog (stella.png, stella2.png …),
+listed in STELLA_PHOTOS in public/client.js. To add/replace them, drop square
+500x500 PNGs here named stella*.png and update that list.
