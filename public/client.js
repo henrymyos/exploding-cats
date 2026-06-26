@@ -50,18 +50,15 @@ function toast(msg, isErr) {
    creating an AudioContext or emitting any noise. */
 const Sound = { isMuted: () => true, toggle() { return true; }, resume() {}, play() {} };
 
-/* ---------------- avatar (which cat — or dog — represents you) ---------------- */
+/* ---------------- avatar (which cat represents you) ---------------- */
 const AVATAR_CATS = ['max', 'pepper', 'gambit', 'loki', 'genevieve'];
-// Stella the dog is pickable too (she's also the Feral Cat in play). The random
-// default stays a cat — you're a cat unless you deliberately choose the dog.
-const AVATAR_OPTIONS = [...AVATAR_CATS, 'stella'];
 let myAvatar = localStorage.getItem('ec_avatar') || AVATAR_CATS[Math.floor(Math.random() * AVATAR_CATS.length)];
 
 function renderAvatarPicker() {
   const box = $('avatarPicker');
   if (!box) return;
-  box.innerHTML = AVATAR_OPTIONS.map((c) => {
-    const label = c === 'stella' ? 'Stella 🐶' : c.charAt(0).toUpperCase() + c.slice(1);
+  box.innerHTML = AVATAR_CATS.map((c) => {
+    const label = c.charAt(0).toUpperCase() + c.slice(1);
     return `<div class="avatar-choice">` +
       `<button class="avatar-opt${c === myAvatar ? ' on' : ''}" data-cat="${c}" style="background-image:url('/assets/cats/${c}.png')" title="${label}"></button>` +
       `<span class="avatar-name">${label}</span>` +
