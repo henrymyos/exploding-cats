@@ -146,7 +146,6 @@ h1 { font-size: 2rem; margin: 0; }
 .mode-opt.on { border-color: var(--accent2); background: var(--panel-light); box-shadow: 0 0 10px rgba(255,207,94,.4); }
 .mode-opt:disabled { cursor: default; }
 .mode-opt.on small { color: var(--accent2); }
-.mode-hint { font-size: .72rem; margin: -4px 0 0; text-align: center; }
 /* read-only for non-creators: dim the deck that isn't selected, keep the chosen one clear */
 .mode-select.readonly .mode-opt { opacity: .45; }
 .mode-select.readonly .mode-opt.on { opacity: 1; }
@@ -191,6 +190,9 @@ h1 { font-size: 2rem; margin: 0; }
 .expansion-select.readonly .exp-opt { cursor: default; }
 .expansion-select.readonly .exp-opt:not(.on) { opacity: .5; }
 
+/* a single setting tile on the home screen, reusing the expansion switch look */
+.setting-opt { margin-top: 8px; }
+
 .bot-controls { display: flex; gap: 8px; margin: 10px 0; }
 .bot-controls .btn { margin-top: 0; }
 .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--good); }
@@ -217,6 +219,12 @@ h1 { font-size: 2rem; margin: 0; }
 }
 .opp.active { border-color: var(--accent2); box-shadow: 0 0 16px rgba(255,207,94,.5); }
 .opp.dead { opacity: .4; filter: grayscale(1); }
+/* my own seat in the top lineup (the optional "show my seat" setting) — tinted so I
+   can pick myself out of the order at a glance, without stealing the active glow. */
+.opp.me { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
+.opp.me .opp-name { color: var(--accent); }
+.you-tag { background: var(--accent); color: #fff; font-size: .54rem; font-weight: 800; letter-spacing: .5px;
+  border-radius: 7px; padding: 1px 6px; line-height: 1.45; }
 .opp-head { display: flex; align-items: center; justify-content: center; gap: 5px; }
 .opp .opp-name { font-weight: 600; font-size: .85rem; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opp .opp-cards { font-size: .72rem; color: var(--muted); margin-top: 2px; }

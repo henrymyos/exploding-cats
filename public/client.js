@@ -69,6 +69,29 @@ function renderAvatarPicker() {
   });
 }
 
+/* ---------------- setting: also show my own seat in the top lineup ----------------
+   Off by default. When on, the player's own tile is added to the top arc (left-most,
+   marked "(You)") so they can see exactly where they sit in the clockwise turn order. */
+let showMySeat = localStorage.getItem('ec_showMySeat') === '1';
+function renderSeatToggle() {
+  const btn = $('seatOrderToggle');
+  if (!btn) return;
+  btn.classList.toggle('on', showMySeat);
+  btn.setAttribute('aria-pressed', showMySeat ? 'true' : 'false');
+}
+(function wireSeatToggle() {
+  const btn = $('seatOrderToggle');
+  if (!btn) return;
+  btn.onclick = () => {
+    showMySeat = !showMySeat;
+    localStorage.setItem('ec_showMySeat', showMySeat ? '1' : '0');
+    renderSeatToggle();
+    lastArcSig = '';           // force the arc to re-lay-out with/without my seat
+    if (state.game) render();  // reflect immediately if a game is already on screen
+  };
+  renderSeatToggle();
+}());
+
 /* ---------------- bootstrap ---------------- */
 fetch('/api/cats').then((r) => r.json()).then((c) => { CATS = c; }).catch(() => {});
 renderAvatarPicker();
@@ -211,7 +234,6 @@ function renderLobby(lobby) {
       });
     } : null;
   });
-  $('modeHint').textContent = isCreator ? 'You pick the deck for this game.' : 'Only the game creator can change the deck.';
   // expansion toggles — also creator-only
   const expansions = lobby.expansions || [];
   const expBox = $('expansionSelect');
@@ -302,10 +324,12 @@ function renderGame(g, lobby) {
   // left -> right -> back to me. (Reverse doesn't move seats; the turn-direction
   // indicator shows which way play is flowing.)
   const meIdx = g.players.findIndex((p) => p.id === PLAYER_ID);
-  const seated = meIdx >= 0
+  const others = meIdx >= 0
     ? g.players.slice(meIdx + 1).concat(g.players.slice(0, meIdx))
     : g.players.slice();
-  const opponents = seated.filter((p) => p.id !== PLAYER_ID);
+  // Normally the top arc is just the other players. With "show my seat" on, lead the
+  // lineup with my own tile so I can see where I sit in the clockwise turn order.
+  const opponents = (showMySeat && meIdx >= 0) ? [g.players[meIdx], ...others] : others;
   const keepIds = new Set();
   opponents.forEach((p, idx) => {
     let div = prevOpp.get(p.id);
@@ -314,7 +338,8 @@ function renderGame(g, lobby) {
       div.dataset.id = p.id;
       div.dataset.fresh = '1';                       // place without the move animation
     }
-    div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead');
+    const isMe = p.id === PLAYER_ID;
+    div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead') + (isMe ? ' me' : '');
     const fanCount = Math.min(p.handCount, 8);
     let fan = '';
     for (let i = 0; i < fanCount; i += 1) fan += '<span class="mini-back"></span>';
@@ -328,7 +353,7 @@ function renderGame(g, lobby) {
       : '';
     // (Streaking a live kitten is secret — opponents show no "holding a kitten" tag.)
     div.innerHTML =
-      `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span></div>` +
+      `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span>${isMe ? '<span class="you-tag">YOU</span>' : ''}</div>` +
       marked +
       `<div class="opp-fan">${fan}</div>` +
       `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
