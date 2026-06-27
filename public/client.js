@@ -237,9 +237,6 @@ function renderLobby(lobby) {
   $('removeBotBtn').disabled = botCount === 0;
   $('startBtn').style.display = isHost ? 'block' : 'none';
   $('startBtn').disabled = !enough;
-  $('lobbyHint').textContent = isHost
-    ? (enough ? 'Everyone in? Add bots to fill seats, then hit start!' : 'Add a bot or wait for another player (need at least 2)...')
-    : 'Waiting for the host to start the game...';
 }
 
 // A player's avatar: their chosen cat photo, or an emoji fallback.
