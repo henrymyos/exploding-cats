@@ -198,11 +198,15 @@ h1 { font-size: 2rem; margin: 0; }
 
 /* ---------------- Game table ---------------- */
 #game { padding: 8px; }
-/* three rows: opponents pinned top, deck dead-centre (auto row between two equal
-   1fr rows), hand pinned to the bottom. */
-#game.active { display: grid; grid-template-rows: 1fr auto 1fr; }
+/* Flex column: opponents pinned at the top, the hand pinned at the very bottom, and
+   the deck centred in whatever space is left between them. The hand sits in its own
+   bottom-anchored row and GROWS UPWARD as cards wrap into more rows, so its last row
+   always hugs the bottom of the screen (a small fixed gap) no matter how many rows
+   there are. The centre yields space to a tall hand instead of the hand being capped
+   and scrolling its bottom rows off-screen. */
+#game.active { display: flex; flex-direction: column; }
 
-.table-top { min-height: 0; align-self: start; }
+.table-top { flex: 0 0 auto; min-height: 0; }
 /* opponents are laid out on an arc (a semicircle around the table) by JS, which
    sets each .opp's left/top/transform and the container's height. */
 .opponents { position: relative; width: 100%; padding-top: 6px; }
@@ -334,8 +338,9 @@ h1 { font-size: 2rem; margin: 0; }
 .mini-back:first-child { margin-left: 0; }
 .opp.dead .opp-fan { display: none; }
 
-/* row 2: just the deck/discard, so they land at the exact vertical centre. */
-.table-center { align-self: center; display: flex; flex-direction: column; align-items: center; position: relative; }
+/* the deck/discard (+ turn banner) centre in the space between the opponents and the
+   hand; this section absorbs the slack (flex:1) and gives ground as the hand grows. */
+.table-center { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; }
 /* row-reverse: draw pile (first in markup) shows on the right, discard on the left */
 .piles { display: flex; flex-direction: row-reverse; gap: 28px; align-items: flex-end; }
 
@@ -410,15 +415,16 @@ h1 { font-size: 2rem; margin: 0; }
 @keyframes liveKittenPulse { 0%,100% { opacity: .7; } 50% { opacity: 1; } }
 
 /* hand */
-/* row 3: turn banner + pending sit just under the deck; the hand is pushed to the
-   very bottom (margin-top:auto) leaving only a sliver of space below it. */
-.hand-area { align-self: stretch; display: flex; flex-direction: column; align-items: center; padding: 4px 4px 2px; }
-.hand-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; min-height: 0; margin: auto 0 6px; }
+/* The hand is the bottom-anchored section (flex:0 0 auto, last child of #game), so its
+   final row always sits a small fixed gap above the screen edge. Extra rows wrap and
+   grow upward into the centre's space rather than pushing the bottom row off-screen. */
+.hand-area { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; padding: 4px 4px 2px; }
+.hand-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; min-height: 0; margin: 0 0 6px; }
 .hand-actions .btn { width: auto; padding: 10px 18px; margin: 0; }
 
 .hand {
   display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
-  max-height: 44vh; overflow-y: auto; padding: 6px;
+  max-height: 56vh; overflow-y: auto; padding: 6px;
 }
 
 .card {
@@ -721,6 +727,6 @@ h1 { font-size: 2rem; margin: 0; }
      opponents arc; any overflow then falls below, where the hand scrolls. */
   .table-center { gap: 8px; justify-content: flex-start; padding-top: 4px; }
   .turn-banner { font-size: .95rem; }
-  .hand { max-height: 34vh; }
+  .hand { max-height: 46vh; }
   .reveal-card .card { width: 104px; height: 146px; }
 }

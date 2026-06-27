@@ -299,7 +299,16 @@ function renderGame(g, lobby) {
   const opp = $('opponents');
   const prevOpp = new Map();
   opp.querySelectorAll(':scope > .opp').forEach((el) => prevOpp.set(el.dataset.id, el));
-  const opponents = g.players.filter((p) => p.id !== PLAYER_ID);
+  // Seat everyone as if we're around one table: I'm at the bottom and the others
+  // fan across the top in clockwise turn order — whoever acts right after me sits
+  // left-most, whoever acts just before me sits right-most, so play sweeps me ->
+  // left -> right -> back to me. (Reverse doesn't move seats; the turn-direction
+  // indicator shows which way play is flowing.)
+  const meIdx = g.players.findIndex((p) => p.id === PLAYER_ID);
+  const seated = meIdx >= 0
+    ? g.players.slice(meIdx + 1).concat(g.players.slice(0, meIdx))
+    : g.players.slice();
+  const opponents = seated.filter((p) => p.id !== PLAYER_ID);
   const keepIds = new Set();
   opponents.forEach((p, idx) => {
     let div = prevOpp.get(p.id);
@@ -524,6 +533,17 @@ window.addEventListener('resize', () => {
   const c = document.getElementById('opponents');
   if (c && c.children.length) arrangeOpponentsArc(c);
 });
+
+// Track whether the player has scrolled the hand up off the bottom, so the
+// sticky-bottom in renderHand only re-pins when they're already at the bottom.
+(() => {
+  const hand = document.getElementById('hand');
+  if (!hand) return;
+  hand.addEventListener('scroll', () => {
+    const atBottom = hand.scrollTop + hand.clientHeight >= hand.scrollHeight - 4;
+    hand.dataset.userScrolled = atBottom ? '0' : '1';
+  });
+})();
 
 // A soft chime when your turn begins (and no blocking pending).
 let prevWasMyTurn = false;
@@ -849,6 +869,14 @@ function renderHand(g, me, isMyTurn) {
   prevStacks.forEach((el, key) => { if (!keepKeys.has(key)) el.remove(); });
 
   renderHandActions(g, me, isMyTurn);
+
+  // The hand grows upward and its last row hugs the bottom edge. On the rare giant
+  // hand that's taller than its cap it scrolls — keep it stuck to the bottom so the
+  // newest/bottom row stays in view, unless the player has scrolled up to look.
+  requestAnimationFrame(() => {
+    if (hand.scrollHeight <= hand.clientHeight + 1) return;   // fits, nothing to do
+    if (hand.dataset.userScrolled !== '1') hand.scrollTop = hand.scrollHeight;
+  });
 }
 
 // Give a chosen card to the player who played a Favor.
@@ -964,7 +992,12 @@ $('drawPile').onclick = () => {
 // For steal/favor we need a player who holds cards; a Targeted Attack can hit
 // anyone still alive.
 function aliveOpponents(g, anyAlive) {
-  return g.players.filter((p) => p.alive && p.id !== PLAYER_ID && (anyAlive || p.handCount > 0));
+  // Same seating order as the arc: others clockwise from my seat (left -> right).
+  const meIdx = g.players.findIndex((p) => p.id === PLAYER_ID);
+  const seated = meIdx >= 0
+    ? g.players.slice(meIdx + 1).concat(g.players.slice(0, meIdx))
+    : g.players.slice();
+  return seated.filter((p) => p.alive && p.id !== PLAYER_ID && (anyAlive || p.handCount > 0));
 }
 
 function promptTarget(me, g, sel, mode) {
