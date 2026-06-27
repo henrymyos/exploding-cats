@@ -1700,28 +1700,48 @@ function showCardTip(el) {
 }
 function hideCardTip() { $('cardTip').classList.add('hidden'); }
 
-// Desktop: hover. Mobile: press-and-hold (without triggering the tap-to-select).
+// Desktop: hover with intent (the cursor must rest on a card a beat before the tip
+// shows). Mobile: press-and-hold. Either way, actually tapping/clicking a card
+// dismisses the tip so it never covers the Play button.
+const TIP_SEL = '.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]';
+const TIP_HOVER_DELAY = 650;  // ms the cursor must hover a card before the tip appears
+const TIP_HOLD_DELAY = 650;   // ms to press-and-hold (touch) before the tip appears
 let tipPressTimer = null, tipSwallowClick = false;
+let tipHoverTimer = null, tipHoverCard = null;
+
+function cancelTipTimers() { clearTimeout(tipHoverTimer); clearTimeout(tipPressTimer); tipHoverCard = null; }
+
 document.addEventListener('mouseover', (e) => {
-  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]');
-  if (card) showCardTip(card);
+  const card = e.target.closest && e.target.closest(TIP_SEL);
+  if (!card || card === tipHoverCard) return;   // same card: let the pending timer keep running
+  tipHoverCard = card;
+  clearTimeout(tipHoverTimer);
+  tipHoverTimer = setTimeout(() => showCardTip(card), TIP_HOVER_DELAY);
 });
 document.addEventListener('mouseout', (e) => {
-  if (e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]')) hideCardTip();
+  const card = e.target.closest && e.target.closest(TIP_SEL);
+  if (!card) return;
+  if (e.relatedTarget && card.contains(e.relatedTarget)) return;  // moved within the same card, still hovering
+  tipHoverCard = null;
+  clearTimeout(tipHoverTimer);
+  hideCardTip();
 });
 document.addEventListener('touchstart', (e) => {
-  const card = e.target.closest && e.target.closest('.card[data-type], .card-mini[data-type], .mark-card[data-type], .discard-chip[data-type]');
+  const card = e.target.closest && e.target.closest(TIP_SEL);
   if (!card) return;
   clearTimeout(tipPressTimer);
-  tipPressTimer = setTimeout(() => { tipSwallowClick = true; showCardTip(card); }, 380);
+  tipPressTimer = setTimeout(() => { tipSwallowClick = true; showCardTip(card); }, TIP_HOLD_DELAY);
 }, { passive: true });
 function endPress() { clearTimeout(tipPressTimer); setTimeout(hideCardTip, 1400); }
 document.addEventListener('touchend', endPress);
 document.addEventListener('touchmove', () => { clearTimeout(tipPressTimer); hideCardTip(); });
 document.addEventListener('touchcancel', endPress);
-// swallow the click that follows a long-press so it doesn't also select the card
+// A long-press shows the tip and its trailing click is swallowed (so it doesn't also
+// select). A real tap/click on a card instead dismisses the tip and selects, so the
+// description never sits on top of the Play button.
 document.addEventListener('click', (e) => {
-  if (tipSwallowClick) { tipSwallowClick = false; e.stopPropagation(); e.preventDefault(); }
+  if (tipSwallowClick) { tipSwallowClick = false; e.stopPropagation(); e.preventDefault(); return; }
+  if (e.target.closest && e.target.closest(TIP_SEL)) { cancelTipTimers(); hideCardTip(); }
 }, true);
 
 function escapeHtml(s) {
