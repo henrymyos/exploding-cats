@@ -17,9 +17,9 @@ npm start
 ```
 
 Then open <http://localhost:3000> in a browser. On your home network, others can
-join from `http://<your-computer-ip>:3000`. To play across the internet, deploy
-to any host that runs a persistent Node process (Render, Railway, Fly.io, a
-Raspberry Pi, etc.) — it just needs a long-lived server for the WebSocket.
+join from `http://<your-computer-ip>:3000`. The live game is deployed on Vercel.
+Note that the multiplayer server keeps a long-lived WebSocket connection, so the
+host has to run a persistent Node process rather than short-lived functions.
 
 ## Adding your cats
 
