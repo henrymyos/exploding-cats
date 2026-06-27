@@ -223,10 +223,13 @@ h1 { font-size: 2rem; margin: 0; }
    can pick myself out of the order at a glance, without stealing the active glow. */
 .opp.me { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
 .opp.me .opp-name { color: var(--accent); }
-.you-tag { background: var(--accent); color: #fff; font-size: .54rem; font-weight: 800; letter-spacing: .5px;
-  border-radius: 7px; padding: 1px 6px; line-height: 1.45; }
+/* corner pill so my own tile stays the same size as the others */
+.you-tag { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); z-index: 2;
+  background: var(--accent); color: #fff; font-size: .54rem; font-weight: 800; letter-spacing: .5px;
+  border-radius: 8px; padding: 1px 7px; line-height: 1.45; box-shadow: 0 1px 3px rgba(0,0,0,.5); }
 .opp-head { display: flex; align-items: center; justify-content: center; gap: 5px; }
-.opp .opp-name { font-weight: 600; font-size: .85rem; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* fixed name width keeps every tile the same size regardless of name length */
+.opp .opp-name { font-weight: 600; font-size: .85rem; width: 96px; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opp .opp-cards { font-size: .72rem; color: var(--muted); margin-top: 2px; }
 /* Mark (Streaking Kittens): the flipped card shown face-up atop a hand. */
 .opp .opp-marked { display: flex; justify-content: center; flex-wrap: wrap; gap: 4px; margin: 3px 0 1px; }
@@ -256,7 +259,7 @@ h1 { font-size: 2rem; margin: 0; }
 .opponents[data-count="1"] .opp-head,
 .opponents[data-count="2"] .opp-head { flex-direction: column; gap: 3px; }
 .opponents[data-count="1"] .opp .opp-name,
-.opponents[data-count="2"] .opp .opp-name { max-width: 104px; font-size: .9rem; }
+.opponents[data-count="2"] .opp .opp-name { width: 104px; font-size: .9rem; }
 .opponents[data-count="1"] .opp .opp-avatar,
 .opponents[data-count="2"] .opp .opp-avatar { width: 42px; height: 42px; }
 .opponents[data-count="1"] .opp-fan,
@@ -267,7 +270,7 @@ h1 { font-size: 2rem; margin: 0; }
 .opponents[data-count="2"] .opp .opp-cards { font-size: .76rem; }
 
 .opponents[data-count="3"] .opp { padding: 7px 10px 5px; }
-.opponents[data-count="3"] .opp .opp-name { max-width: 80px; font-size: .78rem; }
+.opponents[data-count="3"] .opp .opp-name { width: 80px; font-size: .78rem; }
 .opponents[data-count="3"] .opp .opp-avatar { width: 32px; height: 32px; }
 .opponents[data-count="3"] .opp-fan { height: 20px; }
 .opponents[data-count="3"] .mini-back { width: 13px; height: 20px; margin-left: -7px; }
@@ -286,7 +289,7 @@ h1 { font-size: 2rem; margin: 0; }
 .opponents[data-count="10"] .opp .opp-avatar { width: 24px; height: 24px; }
 .opponents[data-count="6"] .opp .opp-name, .opponents[data-count="7"] .opp .opp-name,
 .opponents[data-count="8"] .opp .opp-name, .opponents[data-count="9"] .opp .opp-name,
-.opponents[data-count="10"] .opp .opp-name { max-width: 50px; font-size: .58rem; }
+.opponents[data-count="10"] .opp .opp-name { width: 50px; font-size: .58rem; }
 .opponents[data-count="6"] .opp .opp-cards, .opponents[data-count="7"] .opp .opp-cards,
 .opponents[data-count="8"] .opp .opp-cards, .opponents[data-count="9"] .opp .opp-cards,
 .opponents[data-count="10"] .opp .opp-cards { font-size: .54rem; }
@@ -353,8 +356,8 @@ h1 { font-size: 2rem; margin: 0; }
 .piles { display: flex; flex-direction: row-reverse; gap: 28px; align-items: flex-end; }
 
 /* odds-of-an-exploding-kitten bar, centred above the draw/discard piles */
-.odds-bar { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 3px; width: 150px; pointer-events: none; z-index: 4; }
+/* sits in normal flow right above the deck/discard piles */
+.odds-bar { display: flex; flex-direction: column; align-items: center; gap: 3px; width: 150px; margin-bottom: 8px; pointer-events: none; }
 .odds-bar.hidden { display: none; }
 .odds-track { width: 100%; height: 9px; border-radius: 6px; background: rgba(255,255,255,.12);
   overflow: hidden; box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); }
@@ -584,7 +587,7 @@ h1 { font-size: 2rem; margin: 0; }
      all opponents fit across the top without overlapping each other. */
   .opp { min-width: 0; padding: 5px 7px 4px; }
   .opp-head { flex-direction: column; gap: 2px; }
-  .opp .opp-name { max-width: 60px; font-size: .68rem; }
+  .opp .opp-name { width: 60px; font-size: .68rem; }
   .opp .opp-avatar { width: 26px; height: 26px; }
   .opp-fan { height: 16px; }
   .mini-back { width: 11px; height: 16px; margin-left: -6px; }
@@ -724,7 +727,7 @@ h1 { font-size: 2rem; margin: 0; }
   .card .card-name { font-size: .54rem; }
   .pile-back, .card-mini { width: 82px; height: 116px; }
   .opp { min-width: 0; }
-  .opp .opp-name { max-width: 52px; }
+  .opp .opp-name { width: 52px; }
 }
 
 /* short screens (small phones, landscape-ish): keep the whole table on screen by
