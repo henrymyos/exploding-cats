@@ -692,6 +692,9 @@ h1 { font-size: 2rem; margin: 0; }
 @media (display-mode: standalone) {
   .screen { height: calc(var(--app-height, 100dvh) + env(safe-area-inset-bottom)); }
   #game.my-turn::after { bottom: calc(-1 * env(safe-area-inset-bottom)); }
+  /* Sit the hand just above the home indicator — a small clearance, not the full
+     safe-area inset, so the bottom row hugs the edge instead of floating high. */
+  .hand-area { padding-bottom: max(8px, calc(env(safe-area-inset-bottom) - 20px)); }
 }
 
 .log-panel {
