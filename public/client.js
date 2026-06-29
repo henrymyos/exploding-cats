@@ -30,8 +30,11 @@ const screens = { home: $('home'), lobby: $('lobby'), game: $('game') };
 // or the app returns from the background, leaving a big gap below the cards.)
 //
 // iOS home-screen (standalone) apps are the exception — there %/vh/dvh don't fill
-// the screen — so in standalone we DO pin the height, kept continuously fresh from
-// the live visible viewport (visualViewport) so it can never go stale.
+// the screen — so in standalone we DO pin the height. Use window.innerHeight: with
+// viewport-fit=cover it spans the FULL screen including the safe areas. (We must NOT
+// use visualViewport.height here — on iOS it comes up short by the bottom home-
+// indicator inset, which leaves a gap below the hand and stops the "my turn" outline
+// short of the bottom edge.)
 function isStandalone() {
   return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     || window.navigator.standalone === true;
@@ -39,14 +42,12 @@ function isStandalone() {
 function setAppHeight() {
   const root = document.documentElement;
   if (!isStandalone()) { root.style.removeProperty('--app-height'); return; } // browser tab → 100dvh
-  const vv = window.visualViewport;
-  const h = Math.round(vv && vv.height ? vv.height : window.innerHeight);
+  const h = window.innerHeight;
   if (h) root.style.setProperty('--app-height', h + 'px');
 }
 setAppHeight();
 ['resize', 'orientationchange', 'pageshow', 'load'].forEach((ev) =>
   window.addEventListener(ev, () => { setAppHeight(); setTimeout(setAppHeight, 200); }));
-if (window.visualViewport) window.visualViewport.addEventListener('resize', setAppHeight);
 
 function showScreen(name) {
   for (const k of Object.keys(screens)) screens[k].classList.toggle('active', k === name);
