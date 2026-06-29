@@ -685,15 +685,14 @@ h1 { font-size: 2rem; margin: 0; }
 }
 
 /* Home-screen (standalone) apps: the layout viewport stops at the home-indicator
-   safe area, so the screen background AND the fixed "my turn" outline ended above it,
-   leaving a dark strip at the very bottom outside the game box. Stretch both down into
-   that bottom inset so the app fills the whole display. The hand keeps its own
-   safe-area-inset-bottom padding, so the cards still clear the home indicator. */
+   safe area, and iOS won't let on-screen elements (including the fixed "my turn"
+   outline) draw into that bottom strip — only the page background bleeds there. So we
+   just fill that strip with the matching background by stretching the screen into it,
+   and sit the hand just above the home indicator (a small clearance, not the full
+   inset, so the bottom row hugs the edge instead of floating high). The outline stays
+   at the safe-area edge — it can't go lower, so we don't fight it. */
 @media (display-mode: standalone) {
   .screen { height: calc(var(--app-height, 100dvh) + env(safe-area-inset-bottom)); }
-  #game.my-turn::after { bottom: calc(-1 * env(safe-area-inset-bottom)); }
-  /* Sit the hand just above the home indicator — a small clearance, not the full
-     safe-area inset, so the bottom row hugs the edge instead of floating high. */
   .hand-area { padding-bottom: max(8px, calc(env(safe-area-inset-bottom) - 20px)); }
 }
 
