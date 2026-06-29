@@ -21,16 +21,32 @@ let selected = new Set(); // selected card ids in hand
 const $ = (id) => document.getElementById(id);
 const screens = { home: $('home'), lobby: $('lobby'), game: $('game') };
 
-// iOS home-screen (standalone) apps don't reliably fill the screen with %/vh/dvh,
-// which left a gap below the hand. Pin the app height to the real window height so
-// the game grid always reaches the bottom of the screen.
+// Keep the game screen exactly as tall as what's actually visible, so the hand's
+// bottom row always hugs the screen edge.
+//
+// In a normal browser tab we let CSS `100dvh` do this: the dynamic viewport unit
+// tracks the address bar as it shows/hides. (We used to pin --app-height to a fixed
+// window.innerHeight here, but that pixel value goes stale when the toolbar toggles
+// or the app returns from the background, leaving a big gap below the cards.)
+//
+// iOS home-screen (standalone) apps are the exception — there %/vh/dvh don't fill
+// the screen — so in standalone we DO pin the height, kept continuously fresh from
+// the live visible viewport (visualViewport) so it can never go stale.
+function isStandalone() {
+  return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+    || window.navigator.standalone === true;
+}
 function setAppHeight() {
-  const h = window.innerHeight;
-  if (h) document.documentElement.style.setProperty('--app-height', h + 'px');
+  const root = document.documentElement;
+  if (!isStandalone()) { root.style.removeProperty('--app-height'); return; } // browser tab → 100dvh
+  const vv = window.visualViewport;
+  const h = Math.round(vv && vv.height ? vv.height : window.innerHeight);
+  if (h) root.style.setProperty('--app-height', h + 'px');
 }
 setAppHeight();
 ['resize', 'orientationchange', 'pageshow', 'load'].forEach((ev) =>
-  window.addEventListener(ev, () => setTimeout(setAppHeight, 120)));
+  window.addEventListener(ev, () => { setAppHeight(); setTimeout(setAppHeight, 200); }));
+if (window.visualViewport) window.visualViewport.addEventListener('resize', setAppHeight);
 
 function showScreen(name) {
   for (const k of Object.keys(screens)) screens[k].classList.toggle('active', k === name);
