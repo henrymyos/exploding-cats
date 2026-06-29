@@ -741,3 +741,17 @@ h1 { font-size: 2rem; margin: 0; }
   .hand { max-height: 46vh; }
   .reveal-card .card { width: 104px; height: 146px; }
 }
+
+/* short screens (e.g. iPhone SE): tighten the home/lobby gaps so the whole card
+   stack — now including the "show my seat" setting — fits without scrolling. */
+@media (max-height: 740px) {
+  #home, #lobby { gap: 6px; padding: 8px 14px; }
+  .home-card { padding: 12px 18px; }
+  .tagline { margin: 2px 0 6px; }
+  .field { margin: 7px 0; }
+  .field span { margin-bottom: 4px; }
+  .field input { padding: 10px; }
+  .divider { margin: 9px 0; }
+  .setting-opt { margin-top: 5px; }
+  .avatar-opt { width: 42px; height: 42px; }
+}
