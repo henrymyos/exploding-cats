@@ -58,9 +58,15 @@ const socketIndex = new Map(); // socket.id -> { code, playerId }
 // so we never hand a returning player's seat back to a bot.
 const playerSocket = new Map();
 function socketForPlayer(code, playerId) {
-  // Always target the player's CURRENT socket. (During a reconnect the old, dead
-  // socket can still be in socketIndex; emitting to it would drop the update.)
-  return playerSocket.get(playerId) || '__none__';
+  // Target the player's CURRENT socket (during a reconnect the old, dead socket can
+  // still be in socketIndex; emitting to it would drop the update). Only deliver if
+  // that socket is actually in THIS room — otherwise a player who left and joined a
+  // different room would receive their old room's state on their new connection.
+  const sid = playerSocket.get(playerId);
+  if (!sid) return '__none__';
+  const info = socketIndex.get(sid);
+  if (!info || info.code !== code) return '__none__';
+  return sid;
 }
 
 function ackErr(cb, error) {
@@ -238,11 +244,12 @@ io.on('connection', (socket) => {
     // them out and hand their seat to a bot right after they came back.
     if (playerSocket.get(info.playerId) !== socket.id) return;
     playerSocket.delete(info.playerId);
-    manager.leaveRoom(info.code, info.playerId);
+    // Don't bot their seat immediately — give them a grace window to come back.
+    manager.disconnectPlayer(info.code, info.playerId);
     const room = manager.getRoom(info.code);
     if (room) {
       broadcast(info.code);
-      if (room.game) manager.scheduleBots(room); // AI covers the seat if needed
+      if (room.game) manager.scheduleBots(room); // keep other bots moving; this seat waits
     }
   });
 });

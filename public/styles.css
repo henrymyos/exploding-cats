@@ -223,6 +223,11 @@ h1 { font-size: 2rem; margin: 0; }
    can pick myself out of the order at a glance, without stealing the active glow. */
 .opp.me { background: color-mix(in srgb, var(--accent) 18%, var(--panel)); }
 .opp.me .opp-name { color: var(--accent); }
+/* a seat whose player just dropped — pulsing while they have a chance to reconnect
+   (before the AI takes over). */
+.opp.reconnecting { animation: oppReconnect 1.2s ease-in-out infinite; }
+.opp.reconnecting .opp-cards { color: var(--accent2); font-weight: 700; }
+@keyframes oppReconnect { 0%, 100% { opacity: .5; } 50% { opacity: .85; } }
 /* corner pill so my own tile stays the same size as the others */
 .you-tag { position: absolute; top: -7px; left: 50%; transform: translateX(-50%); z-index: 2;
   background: var(--accent); color: #fff; font-size: .54rem; font-weight: 800; letter-spacing: .5px;

@@ -7,6 +7,10 @@ require('./actions'); // augments Game.prototype
 
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no ambiguous chars
 const MIN_PLAYERS = 2;
+// How long a player who just dropped (e.g. backgrounded the app) has to come back
+// before the AI takes over their seat. A clean "leave game" hands off immediately.
+// (Overridable via env only so tests can use a short window; defaults to 30s.)
+const SEAT_GRACE_MS = Number(process.env.EK_SEAT_GRACE_MS) || 30000;
 
 // Max seats depend on the chosen deck (Original = 5, Party Pack = 10).
 function maxPlayers(room) {
@@ -112,6 +116,7 @@ class RoomManager {
       if (room.game) {
         const seat = room.game.playerById(playerId);
         if (seat && !seat.isBot) seat.botControlled = false;
+        this.cancelSeatTakeover(room, playerId); // they're back within the grace window
       }
       return { room };
     }
@@ -141,11 +146,60 @@ class RoomManager {
     }
   }
 
+  // A socket dropped (the app was backgrounded/closed, network blip, etc.). Unlike an
+  // explicit leave, we DON'T hand the seat to a bot right away — the player gets a
+  // grace window to reconnect first; only if they're still gone does the AI take over.
+  disconnectPlayer(code, playerId) {
+    const room = this.getRoom(code);
+    if (!room) return;
+    if (!room.game) {
+      // No game in progress — nothing to babysit; treat as a normal lobby leave.
+      this.leaveRoom(code, playerId);
+      return;
+    }
+    const p = room.players.find((pl) => pl.id === playerId);
+    if (p) p.connected = false;        // shown as "reconnecting", NOT yet a bot
+    this.scheduleSeatTakeover(room, playerId);
+  }
+
+  // Arm the grace timer: after SEAT_GRACE_MS, if they're still away, the AI takes the seat.
+  scheduleSeatTakeover(room, playerId) {
+    if (!room.takeoverTimers) room.takeoverTimers = new Map();
+    const existing = room.takeoverTimers.get(playerId);
+    if (existing) clearTimeout(existing);
+    const t = setTimeout(() => {
+      room.takeoverTimers.delete(playerId);
+      const g = room.game;
+      if (!g || g.phase !== 'playing') return;
+      const pl = room.players.find((x) => x.id === playerId);
+      if (!pl || pl.connected) return; // they came back in time — leave their seat alone
+      const seat = g.playerById(playerId);
+      if (seat && !seat.isBot) seat.botControlled = true;
+      this.broadcast(room.code);
+      this.scheduleBots(room);         // the AI now drives the abandoned seat
+    }, SEAT_GRACE_MS);
+    room.takeoverTimers.set(playerId, t);
+  }
+
+  // They reconnected within the window — cancel the pending takeover.
+  cancelSeatTakeover(room, playerId) {
+    if (!room || !room.takeoverTimers) return;
+    const t = room.takeoverTimers.get(playerId);
+    if (t) { clearTimeout(t); room.takeoverTimers.delete(playerId); }
+  }
+
+  clearTakeovers(room) {
+    if (!room || !room.takeoverTimers) return;
+    for (const t of room.takeoverTimers.values()) clearTimeout(t);
+    room.takeoverTimers.clear();
+  }
+
   // A player explicitly leaves the current game (returns them to the home screen).
   // Their seat is handed to the AI so everyone else can keep playing.
   leaveGame(code, playerId) {
     const room = this.getRoom(code);
     if (!room) return { error: 'Room not found.' };
+    this.cancelSeatTakeover(room, playerId); // explicit leave = hand off now, no grace
     this.leaveRoom(code, playerId);
     return { room: this.getRoom(code) || null };
   }
@@ -157,6 +211,7 @@ class RoomManager {
     if (room.hostId !== playerId) return { error: 'Only the host can end the game.' };
     if (room.timer) { clearTimeout(room.timer); room.timer = null; }
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
+    this.clearTakeovers(room);
     room.game = null;
     // Drop any disconnected players and all bots; keep connected humans in the lobby.
     room.players = room.players.filter((p) => p.connected && !p.isBot);
@@ -187,6 +242,7 @@ class RoomManager {
     const room = this.getRoom(code);
     if (room && room.timer) clearTimeout(room.timer);
     if (room && room.botTimer) clearTimeout(room.botTimer);
+    this.clearTakeovers(room);
     this.rooms.delete((code || '').toUpperCase());
   }
 

@@ -313,7 +313,8 @@ function renderGame(g, lobby) {
   $('game').classList.toggle('my-turn', isMyTurn && g.phase === 'playing');
   // avatar lookup (avatars live on the lobby payload, not the game snapshot)
   const avById = {};
-  (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; });
+  const connById = {};
+  (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; connById[p.id] = p.connected; });
 
   // opponents (everyone but me) — show a fan of card backs for their hand.
   // Reuse the tiles across renders (keyed by player id) so their arc positions
@@ -343,7 +344,11 @@ function renderGame(g, lobby) {
       div.dataset.fresh = '1';                       // place without the move animation
     }
     const isMe = p.id === PLAYER_ID;
-    div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead') + (isMe ? ' me' : '');
+    // Dropped but not yet bot-controlled: they're in the grace window before the AI
+    // takes over. Show "reconnecting…" so a paused turn doesn't look frozen.
+    const reconnecting = !isMe && connById[p.id] === false && !p.isBot;
+    div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead')
+      + (isMe ? ' me' : '') + (reconnecting ? ' reconnecting' : '');
     const fanCount = Math.min(p.handCount, 8);
     let fan = '';
     for (let i = 0; i < fanCount; i += 1) fan += '<span class="mini-back"></span>';
@@ -360,7 +365,7 @@ function renderGame(g, lobby) {
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span>${isMe ? '<span class="you-tag">YOU</span>' : ''}</div>` +
       marked +
       `<div class="opp-fan">${fan}</div>` +
-      `<div class="opp-cards">${p.handCount} card${p.handCount === 1 ? '' : 's'}</div>`;
+      `<div class="opp-cards">${reconnecting ? 'reconnecting…' : `${p.handCount} card${p.handCount === 1 ? '' : 's'}`}</div>`;
     if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
     keepIds.add(p.id);
   });
