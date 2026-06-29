@@ -84,27 +84,27 @@ html, body {
   /* center when it fits, but top-align when taller than the screen so the title
      stays reachable while scrolling */
   justify-content: safe center;
-  gap: 10px;
-  padding: 16px;
+  gap: 7px;
+  padding: 11px 14px;
   overflow-y: auto;
 }
 
 .home-card {
   background: var(--panel);
   border-radius: 20px;
-  padding: 18px 22px;
+  padding: 13px 20px;
   width: min(420px, 100%);
   box-shadow: var(--shadow);
   text-align: center;
 }
 
-h1 { font-size: 2rem; margin: 0; }
-.tagline { color: var(--accent2); margin: 3px 0 12px; letter-spacing: 2px; text-transform: uppercase; font-size: .8rem; }
+h1 { font-size: 1.8rem; margin: 0; }
+.tagline { color: var(--accent2); margin: 2px 0 7px; letter-spacing: 2px; text-transform: uppercase; font-size: .8rem; }
 
-.field { display: block; text-align: left; margin: 10px 0; }
-.field span { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 6px; }
+.field { display: block; text-align: left; margin: 7px 0; }
+.field span { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
 .field input {
-  width: 100%; padding: 14px; border-radius: 10px; border: 2px solid var(--panel-light);
+  width: 100%; padding: 11px; border-radius: 10px; border: 2px solid var(--panel-light);
   background: var(--bg2); color: var(--text); font-size: 1.1rem; outline: none;
 }
 .field input:focus { border-color: var(--accent); }
@@ -122,7 +122,7 @@ h1 { font-size: 2rem; margin: 0; }
 .btn.danger { background: var(--danger); }
 .btn.ghost { background: transparent; border: 1px solid var(--panel-light); color: var(--muted); }
 
-.divider { position: relative; margin: 14px 0; color: var(--muted); font-size: .8rem; }
+.divider { position: relative; margin: 9px 0; color: var(--muted); font-size: .8rem; }
 .divider::before { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: var(--panel-light); }
 .divider span { position: relative; background: var(--panel); padding: 0 12px; }
 
@@ -158,7 +158,7 @@ h1 { font-size: 2rem; margin: 0; }
 .exp-opt {
   --exp: var(--accent2);
   display: flex; align-items: center; gap: 11px; width: 100%; text-align: left;
-  padding: 9px 11px; border-radius: 14px; cursor: pointer; color: var(--text);
+  padding: 8px 10px; border-radius: 14px; cursor: pointer; color: var(--text);
   background: var(--bg2); border: 1.5px solid transparent;
   transition: border-color .18s, background .18s, box-shadow .18s;
 }
@@ -171,7 +171,7 @@ h1 { font-size: 2rem; margin: 0; }
   width: 34px; height: 34px; flex-shrink: 0; border-radius: 10px; display: grid; place-items: center;
   font-size: 1.15rem; background: rgba(255,255,255,.06); transition: background .18s, transform .18s;
 }
-.exp-info { flex: 1; min-width: 0; line-height: 1.15; }
+.exp-info { flex: 1; min-width: 0; line-height: 1.1; }
 .exp-info b { display: block; font-size: .88rem; }
 .exp-info small { display: block; font-size: .66rem; color: var(--muted); margin-top: 1px; }
 
@@ -191,7 +191,7 @@ h1 { font-size: 2rem; margin: 0; }
 .expansion-select.readonly .exp-opt:not(.on) { opacity: .5; }
 
 /* a single setting tile on the home screen, reusing the expansion switch look */
-.setting-opt { margin-top: 8px; }
+.setting-opt { margin-top: 5px; }
 
 .bot-controls { display: flex; gap: 8px; margin: 10px 0; }
 .bot-controls .btn { margin-top: 0; }
@@ -311,7 +311,7 @@ h1 { font-size: 2rem; margin: 0; }
 .avatar-choice { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .avatar-name { font-size: 10.5px; color: var(--muted); font-weight: 600; }
 .avatar-choice:has(.avatar-opt.on) .avatar-name { color: var(--accent2); }
-.avatar-opt { width: 46px; height: 46px; border-radius: 50%; background-size: cover; background-position: center; border: 3px solid var(--panel-light); cursor: pointer; padding: 0; transition: transform .12s; }
+.avatar-opt { width: 42px; height: 42px; border-radius: 50%; background-size: cover; background-position: center; border: 3px solid var(--panel-light); cursor: pointer; padding: 0; transition: transform .12s; }
 .avatar-opt:hover { transform: scale(1.08); }
 .avatar-opt.on { border-color: var(--accent2); box-shadow: 0 0 12px rgba(255,207,94,.6); transform: scale(1.06); }
 
@@ -759,4 +759,22 @@ h1 { font-size: 2rem; margin: 0; }
   .divider { margin: 9px 0; }
   .setting-opt { margin-top: 5px; }
   .avatar-opt { width: 42px; height: 42px; }
+}
+
+/* very narrow screens (small phones, or iOS Display Zoom / large-text mode, which
+   shrinks the effective CSS width). Kept LAST so it wins when a width- and a
+   height-based query both match — pack the home/lobby stack tighter so it all fits
+   without scrolling. */
+@media (max-width: 360px) {
+  h1 { font-size: 1.55rem; }
+  .tagline { margin: 1px 0 5px; }
+  .home-card { padding: 11px 14px; }
+  .avatar-opt { width: 40px; height: 40px; }
+  .avatar-picker .avatar-name { display: none; }  /* photos are distinct; drop labels so the picker stays one row */
+  .avatar-picker { gap: 6px; }
+  .exp-icon { width: 30px; height: 30px; font-size: 1rem; }
+  .exp-info small { font-size: .62rem; }
+  .field input { padding: 9px; font-size: 1rem; }
+  .field { margin: 6px 0; }
+  .divider { margin: 7px 0; }
 }
