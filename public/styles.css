@@ -84,7 +84,7 @@ html, body {
   /* center when it fits, but top-align when taller than the screen so the title
      stays reachable while scrolling */
   justify-content: safe center;
-  gap: 10px;           /* space between the two cards on the home screen */
+  gap: 20px;           /* space between the two cards on the home screen */
   padding: 16px;
   overflow-y: auto;
 }
