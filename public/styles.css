@@ -683,6 +683,17 @@ h1 { font-size: 2rem; margin: 0; }
      screen to overflow). */
   .home-card:first-child { margin-top: env(safe-area-inset-top); }
 }
+
+/* Home-screen (standalone) apps: the layout viewport stops at the home-indicator
+   safe area, so the screen background AND the fixed "my turn" outline ended above it,
+   leaving a dark strip at the very bottom outside the game box. Stretch both down into
+   that bottom inset so the app fills the whole display. The hand keeps its own
+   safe-area-inset-bottom padding, so the cards still clear the home indicator. */
+@media (display-mode: standalone) {
+  .screen { height: calc(var(--app-height, 100dvh) + env(safe-area-inset-bottom)); }
+  #game.my-turn::after { bottom: calc(-1 * env(safe-area-inset-bottom)); }
+}
+
 .log-panel {
   position: fixed; top: 0; right: -320px; width: 300px; height: 100%; background: var(--panel);
   z-index: 35; padding: 16px; box-shadow: var(--shadow); transition: right .2s; overflow-y: auto;
