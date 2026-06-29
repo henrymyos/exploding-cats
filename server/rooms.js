@@ -408,7 +408,9 @@ class RoomManager {
     const g = room.game;
     if (!g || g.phase !== 'playing') return;
     const bot = g.playerById(botId);
-    if (!bot || !bot.alive) { this.scheduleBots(room); return; }
+    // Re-check the seat is still AI-driven: a human may have reconnected and
+    // reclaimed it between scheduling and now, so don't act on their behalf.
+    if (!bot || !bot.alive || !isBotSeat(bot)) { this.scheduleBots(room); return; }
     const p = g.pending;
 
     if (type === 'nope') {

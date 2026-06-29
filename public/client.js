@@ -143,15 +143,19 @@ $('startBtn').onclick = () => {
   });
 };
 
-/* auto-rejoin after a refresh */
-const savedCode = localStorage.getItem('ec_code');
+/* Re-join after a refresh OR a dropped-then-restored connection (e.g. backgrounding
+   the app on a phone). socket.io fires 'connect' on every reconnect, so we re-send
+   joinRoom whenever we still hold a room code — this is what tells the server our
+   seat is human again. Without it the seat stays bot-controlled and we can't play. */
 socket.on('connect', () => {
-  if (savedCode && state.code == null) {
-    const name = $('nameInput').value.trim() || 'Player';
-    socket.emit('joinRoom', { code: savedCode, name, playerId: PLAYER_ID, avatar: myAvatar }, (res) => {
-      if (res.ok) state.code = res.code;
-    });
-  }
+  const code = state.code || localStorage.getItem('ec_code');
+  if (!code) return;
+  // use our saved name so a reconnect never renames us to a generic default
+  const name = localStorage.getItem('ec_name') || $('nameInput').value.trim() || 'Player';
+  socket.emit('joinRoom', { code, name, playerId: PLAYER_ID, avatar: myAvatar }, (res) => {
+    if (res && res.ok) { state.code = res.code; }
+    else { state.code = null; localStorage.removeItem('ec_code'); render(); } // room is gone
+  });
 });
 
 /* ---------------- state sync ---------------- */

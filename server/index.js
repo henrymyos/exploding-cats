@@ -53,11 +53,14 @@ const manager = new RoomManager(broadcast);
 
 // Track which socket belongs to which player in which room.
 const socketIndex = new Map(); // socket.id -> { code, playerId }
+// playerId -> the socket.id that currently represents them. Lets a late/stale
+// disconnect (from a socket the player already replaced by reconnecting) be ignored
+// so we never hand a returning player's seat back to a bot.
+const playerSocket = new Map();
 function socketForPlayer(code, playerId) {
-  for (const [sid, info] of socketIndex.entries()) {
-    if (info.code === code && info.playerId === playerId) return sid;
-  }
-  return '__none__';
+  // Always target the player's CURRENT socket. (During a reconnect the old, dead
+  // socket can still be in socketIndex; emitting to it would drop the update.)
+  return playerSocket.get(playerId) || '__none__';
 }
 
 function ackErr(cb, error) {
@@ -72,6 +75,7 @@ io.on('connection', (socket) => {
     if (!name || !playerId) return ackErr(cb, 'Missing name.');
     const room = manager.createRoom(name.trim().slice(0, 16), playerId, avatar, mode);
     socketIndex.set(socket.id, { code: room.code, playerId });
+    playerSocket.set(playerId, socket.id);
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
@@ -96,9 +100,13 @@ io.on('connection', (socket) => {
     const { room, error } = manager.joinRoom(code, name.trim().slice(0, 16), playerId, avatar);
     if (error) return ackErr(cb, error);
     socketIndex.set(socket.id, { code: room.code, playerId });
+    playerSocket.set(playerId, socket.id);
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
+    // If this was a reconnect mid-game, the seat is human again now — re-evaluate
+    // the bots so the AI stops driving the reclaimed seat.
+    if (room.game) manager.scheduleBots(room);
   });
 
   socket.on('react', ({ code, playerId, emoji }, cb) => {
@@ -197,6 +205,7 @@ io.on('connection', (socket) => {
   socket.on('leaveGame', ({ code, playerId }, cb) => {
     manager.leaveGame(code, playerId);
     socketIndex.delete(socket.id);
+    if (playerSocket.get(playerId) === socket.id) playerSocket.delete(playerId);
     socket.leave(code);
     ackOk(cb);
     const room = manager.getRoom(code);
@@ -222,14 +231,18 @@ io.on('connection', (socket) => {
 
   socket.on('disconnect', () => {
     const info = socketIndex.get(socket.id);
-    if (info) {
-      manager.leaveRoom(info.code, info.playerId);
-      socketIndex.delete(socket.id);
-      const room = manager.getRoom(info.code);
-      if (room) {
-        broadcast(info.code);
-        if (room.game) manager.scheduleBots(room); // AI covers the seat if needed
-      }
+    socketIndex.delete(socket.id);
+    if (!info) return;
+    // If the player already reconnected on a newer socket, this is a stale
+    // disconnect for a connection they've replaced — do nothing, or we'd knock
+    // them out and hand their seat to a bot right after they came back.
+    if (playerSocket.get(info.playerId) !== socket.id) return;
+    playerSocket.delete(info.playerId);
+    manager.leaveRoom(info.code, info.playerId);
+    const room = manager.getRoom(info.code);
+    if (room) {
+      broadcast(info.code);
+      if (room.game) manager.scheduleBots(room); // AI covers the seat if needed
     }
   });
 });
