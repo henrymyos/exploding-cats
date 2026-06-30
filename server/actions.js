@@ -298,8 +298,15 @@ Game.prototype.resolveAction = function resolveAction() {
       break;
     case 'DRAW_BOTTOM': {
       // Draw the BOTTOM card to end the turn instead of the top one.
-      const card = this.deck.shift(); // bottom (top of deck is the array's end)
+      let card = this.deck.shift(); // bottom (top of deck is the array's end)
+      if (!card) {
+        // Pile's empty — recycle the discards and try the bottom again so the
+        // turn still resolves instead of silently fizzling and re-prompting.
+        this.recycleDiscard();
+        card = this.deck.shift();
+      }
       if (card) this.resolveDraw(actor, card);
+      else this.advanceTurn(); // nothing left anywhere; just pass the turn on
       break;
     }
     default:
@@ -686,14 +693,30 @@ Game.prototype.eliminate = function eliminate(player, card, icon, verb) {
   this.nextAlive(this.direction);
 };
 
-// If a player loses their last Streaking Kitten while holding a live Exploding
-// Kitten, the cat's out of the bag and they explode. Call after any card leaves
-// a hand via Favor/steal.
+// A player is "caught" when they hold a live Exploding Kitten without a Streaking
+// Kitten — e.g. they lost their last Streak via Favor/steal, or a blind grab
+// landed someone else's hidden kitten on them. Official rule: they may still play
+// a Defuse if they have one (spend it, slip the kitten back into the deck);
+// otherwise the cat's out of the bag and they explode. Call after any card leaves
+// or enters a hand via Favor/steal.
 Game.prototype.checkStreakLoss = function checkStreakLoss(player) {
   if (!player || !player.alive) return;
-  const kitten = player.hand.some((c) => c.type === 'EXPLODE');
-  const streak = player.hand.some((c) => c.type === 'STREAK');
-  if (kitten && !streak) {
+  const caught = () => player.hand.some((c) => c.type === 'EXPLODE') && !player.hand.some((c) => c.type === 'STREAK');
+  // Reflexively defuse as many stray kittens as they have Defuses for.
+  while (caught()) {
+    const defuse = player.hand.find((c) => c.type === 'DEFUSE');
+    if (!defuse) break;
+    const kitten = player.hand.find((c) => c.type === 'EXPLODE');
+    this.removeCardFromHand(player, defuse.id);
+    this.discard.push(defuse);
+    this.removeCardFromHand(player, kitten.id);
+    const i = Math.floor(Math.random() * (this.deck.length + 1));
+    this.deck.splice(this.deck.length - i, 0, kitten); // hide it back in the deck
+    this.defuseWary = 3;
+    this.lastDiscardBy = player.id;
+    this.logMsg(`😼 ${player.name} hastily defused a stray Exploding Kitten and slipped it back into the deck.`);
+  }
+  if (caught()) {
     while (player.hand.length) this.discard.push(player.hand.pop());
     player.alive = false;
     if (!this.deadOrder.includes(player.id)) this.deadOrder.push(player.id);
