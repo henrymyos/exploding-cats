@@ -328,10 +328,16 @@ function renderGame(g, lobby) {
   const isMyTurn = g.turnPlayerId === PLAYER_ID;
   // glow the screen edge yellow while it's your turn
   $('game').classList.toggle('my-turn', isMyTurn && g.phase === 'playing');
+  // Spectator: eliminated while the game plays on. Show a "watching" banner and turn
+  // the hand area into a cheer-along note (see renderHand). Reactions still work.
+  const spectating = !!(me && !me.alive && g.phase === 'playing');
+  $('game').classList.toggle('spectating', spectating);
+  renderSpectatorBar(g, spectating);
   // avatar lookup (avatars live on the lobby payload, not the game snapshot)
   const avById = {};
   const connById = {};
-  (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; connById[p.id] = p.connected; });
+  const takeoverById = {};
+  (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; connById[p.id] = p.connected; takeoverById[p.id] = p.takeoverAt; });
 
   // opponents (everyone but me) — show a fan of card backs for their hand.
   // Reuse the tiles across renders (keyed by player id) so their arc positions
@@ -362,8 +368,10 @@ function renderGame(g, lobby) {
     }
     const isMe = p.id === PLAYER_ID;
     // Dropped but not yet bot-controlled: they're in the grace window before the AI
-    // takes over. Show "reconnecting…" so a paused turn doesn't look frozen.
+    // takes over. Show a live "reconnecting… Ns" countdown so a paused turn doesn't
+    // look frozen and everyone can see how long until the AI steps in.
     const reconnecting = !isMe && connById[p.id] === false && !p.isBot;
+    div.dataset.takeover = reconnecting ? (takeoverById[p.id] || '') : '';
     div.className = 'opp' + (p.id === g.turnPlayerId ? ' active' : '') + (p.alive ? '' : ' dead')
       + (isMe ? ' me' : '') + (reconnecting ? ' reconnecting' : '');
     const fanCount = Math.min(p.handCount, 8);
@@ -382,7 +390,7 @@ function renderGame(g, lobby) {
       `<div class="opp-head">${avEl}<span class="opp-name">${escapeHtml(p.name)}</span>${isMe ? '<span class="you-tag">YOU</span>' : ''}</div>` +
       marked +
       `<div class="opp-fan">${fan}</div>` +
-      `<div class="opp-cards">${reconnecting ? 'reconnecting…' : `${p.handCount} card${p.handCount === 1 ? '' : 's'}`}</div>`;
+      `<div class="opp-cards">${reconnecting ? reconnectLabel(takeoverById[p.id]) : `${p.handCount} card${p.handCount === 1 ? '' : 's'}`}</div>`;
     if (opp.children[idx] !== div) opp.insertBefore(div, opp.children[idx] || null);
     keepIds.add(p.id);
   });
@@ -601,6 +609,32 @@ function handleTurnChime(g) {
   prevWasMyTurn = myTurnNow;
 }
 
+/* ---------------- reconnecting countdown ---------------- */
+// Live "reconnecting… Ns" label, counting down to when the AI takes the seat.
+function reconnectLabel(takeoverAt) {
+  if (!takeoverAt) return 'reconnecting…';
+  const s = Math.max(0, Math.ceil((Number(takeoverAt) - Date.now()) / 1000));
+  return s > 0 ? `reconnecting… ${s}s` : 'reconnecting…';
+}
+// Tick the countdown between server renders (cheap: only touches reconnecting tiles).
+setInterval(() => {
+  document.querySelectorAll('#opponents .opp.reconnecting').forEach((el) => {
+    const cards = el.querySelector('.opp-cards');
+    if (cards) cards.textContent = reconnectLabel(el.dataset.takeover);
+  });
+}, 500);
+
+/* ---------------- spectator banner ---------------- */
+function renderSpectatorBar(g, spectating) {
+  const bar = $('spectatorBar');
+  if (!bar) return;
+  if (!spectating) { bar.classList.add('hidden'); return; }
+  const turnP = g.players.find((p) => p.id === g.turnPlayerId);
+  const whose = turnP ? `${escapeHtml(turnP.name)}'s turn` : '';
+  bar.innerHTML = `💀 You're out — spectating${whose ? ` · ${whose}` : ''}. Tap a reaction to cheer!`;
+  bar.classList.remove('hidden');
+}
+
 /* ---------------- card-taken popup (taker + loser) ---------------- */
 let transferStarted = false;
 let lastTransferSeq = null;
@@ -675,6 +709,7 @@ function showVictory(g, lobby) {
       `<h1>${youWon ? 'You win!' : escapeHtml((winner && winner.name) || 'Game over')}${youWon || !winner ? '' : ' wins!'}</h1>` +
       `<div class="victory-sub">last cat standing</div>` +
       streakLine +
+      recapHTML(g, lobby) +
       `<div id="victoryScores" class="scoreboard"></div>` +
       buttons +
     `</div>`;
@@ -701,25 +736,91 @@ function hideVictory() {
   victoryShown = false;
 }
 
+/* ---------------- end-of-game recap (this game's standings + stats) ---------------- */
+function recapHTML(g, lobby) {
+  const standings = (g.recap && g.recap.standings) || [];
+  if (!standings.length) return '';
+  const avById = {};
+  (lobby && lobby.players ? lobby.players : []).forEach((p) => { avById[p.id] = p.avatar; });
+  const medal = (pl) => (pl === 1 ? '🥇' : pl === 2 ? '🥈' : pl === 3 ? '🥉' : `#${pl}`);
+  const rows = standings.map((s) => {
+    const av = avById[s.id]
+      ? `<span class="rc-av" style="background-image:url('/assets/cats/${avById[s.id]}.png')"></span>`
+      : `<span class="rc-av emoji">${s.isBot ? '🤖' : '😺'}</span>`;
+    const tag = s.id === PLAYER_ID ? '<span class="you-tag">YOU</span>' : (s.isBot ? '<span class="bot-tag">BOT</span>' : '');
+    return `<li class="rc-row${s.place === 1 ? ' win' : ''}">` +
+      `<span class="rc-place">${medal(s.place)}</span>${av}` +
+      `<span class="rc-name">${escapeHtml(s.name)}${tag}</span>` +
+      `<span class="rc-stats">${statChips(s.stats || {})}</span>` +
+    `</li>`;
+  }).join('');
+  return `<div class="recap"><h3 class="rc-title">📊 This game</h3><ul class="rc-list">${rows}</ul>${awardsHTML(standings)}</div>`;
+}
+
+function statChips(s) {
+  const out = [];
+  if (s.drawn) out.push(`🎴 ${s.drawn}`);
+  if (s.steals) out.push(`🐾 ${s.steals}`);
+  if (s.defused) out.push(`🧨 ${s.defused}`);
+  if (s.attacks) out.push(`⚔️ ${s.attacks}`);
+  if (s.nopes) out.push(`🚫 ${s.nopes}`);
+  if (s.kittens) out.push(`💥 ${s.kittens}`);
+  return out.map((t) => `<span class="rc-chip">${t}</span>`).join('') || '<span class="rc-chip muted">—</span>';
+}
+
+// A few fun superlatives, shown only when there's a clear non-zero leader.
+function awardsHTML(standings) {
+  const best = (key) => {
+    let top = null;
+    for (const s of standings) {
+      const v = (s.stats && s.stats[key]) || 0;
+      if (v > 0 && (!top || v > top.v)) top = { name: s.name, v };
+    }
+    return top;
+  };
+  const defs = [
+    { key: 'steals', emoji: '🐾', label: 'busiest paws' },
+    { key: 'defused', emoji: '🧨', label: 'cheated death' },
+    { key: 'attacks', emoji: '⚔️', label: 'most aggressive' },
+    { key: 'nopes', emoji: '🚫', label: 'master of NOPE' },
+  ];
+  const chips = defs.map((d) => {
+    const t = best(d.key);
+    return t ? `<span class="rc-award">${d.emoji} <b>${escapeHtml(t.name)}</b> <small>${d.label} (${t.v})</small></span>` : '';
+  }).filter(Boolean);
+  return chips.length ? `<div class="rc-awards">${chips.join('')}</div>` : '';
+}
+
 /* ---------------- explosion shake ---------------- */
 let prevAlive = null;
 function handleExplodeShake(g) {
   const aliveNow = {};
   g.players.forEach((p) => { aliveNow[p.id] = p.alive; });
   if (prevAlive) {
-    const someoneDied = g.players.some((p) => prevAlive[p.id] === true && p.alive === false);
-    if (someoneDied) screenShake();
+    const died = g.players.filter((p) => prevAlive[p.id] === true && p.alive === false);
+    if (died.length) screenShake(died.some((p) => p.id === PLAYER_ID)); // harder when it's YOU
   }
   prevAlive = aliveNow;
 }
 
-function screenShake() {
+function screenShake(hard) {
   const app = $('app') || document.body;
-  app.classList.remove('shake'); void app.offsetWidth; app.classList.add('shake');
-  setTimeout(() => app.classList.remove('shake'), 650);
+  const cls = hard ? 'shake-hard' : 'shake';
+  app.classList.remove('shake', 'shake-hard'); void app.offsetWidth; app.classList.add(cls);
+  setTimeout(() => app.classList.remove(cls), hard ? 820 : 650);
   const boom = $('boom');
-  if (boom) { boom.classList.remove('on'); void boom.offsetWidth; boom.classList.add('on'); setTimeout(() => boom.classList.remove('on'), 650); }
+  if (boom) { boom.classList.remove('on'); void boom.offsetWidth; boom.classList.add('on'); setTimeout(() => boom.classList.remove('on'), 800); }
+  boomBurst(hard);
   Sound.play('explode');
+}
+
+// A 💥 that punches in at the centre of the screen and fades — bigger when it's you.
+function boomBurst(hard) {
+  const el = document.createElement('div');
+  el.className = 'boom-burst' + (hard ? ' hard' : '');
+  el.textContent = '💥';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 900);
 }
 
 /* ---------------- table animations ---------------- */
@@ -855,6 +956,12 @@ function groupHand(hand) {
 function renderHand(g, me, isMyTurn) {
   const hand = $('hand');
   if (!me) { hand.innerHTML = ''; renderHandActions(g, me, isMyTurn); return; }
+  // Eliminated but the game's still going — turn the hand area into a spectator note.
+  if (!me.alive && g.phase === 'playing') {
+    hand.innerHTML = `<div class="spectator-note">💀 You've been eliminated.<br>Stick around and watch it play out — tap a reaction below to cheer or heckle!</div>`;
+    renderHandActions(g, me, isMyTurn); // clears the action bar (no-op for the dead)
+    return;
+  }
   // keep only still-held selections
   const held = new Set(me.hand.map((c) => c.id));
   selected = new Set([...selected].filter((id) => held.has(id)));
@@ -1192,17 +1299,38 @@ function renderPending(g, me) {
 }
 
 let revealShownFor = null;
+
+// A face-down card back (same look as the draw pile), sized by .reveal-card .card.
+function backFaceHTML() {
+  return `<div class="card card-back-face"></div>`;
+}
+
+// Hold the card face-down for a beat of suspense, then swap in its real face with a
+// quick flip-in and run onReveal. (Content swap — robust across browsers, no 3D.)
+function runSuspense(panel, card, onReveal, hold) {
+  panel.classList.add('suspense');
+  clearTimeout(runSuspense._t);
+  runSuspense._t = setTimeout(() => {
+    panel.classList.remove('suspense');
+    const slot = panel.querySelector('.reveal-card');
+    if (slot) slot.innerHTML = `<div class="card reveal-flip" data-type="${card.type}">${cardFace(card)}</div>`;
+    onReveal();
+  }, hold || 800);
+}
+
 function showDrawReveal(card) {
   const panel = $('drawReveal');
   if (revealShownFor === card.id) return; // already showing this draw
   revealShownFor = card.id;
   panel.innerHTML =
-    `<div class="reveal-title">You drew…</div>` +
-    `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
-    `<button class="btn primary" id="drawContinueBtn">Continue → end turn</button>`;
+    `<div class="reveal-title" id="revealTitle">Drawing…</div>` +
+    `<div class="reveal-card">${backFaceHTML()}</div>` +
+    `<div class="reveal-foot"><button class="btn primary" id="drawContinueBtn">Continue → end turn</button></div>`;
   panel.classList.remove('hidden');
   // small entrance animation
   panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
+  Sound.play('draw');
+  runSuspense(panel, card, () => { const t = document.getElementById('revealTitle'); if (t) t.textContent = 'You drew…'; });
   $('drawContinueBtn').onclick = () => {
     // fly the card from the left panel into your hand
     const cardEl = panel.querySelector('.reveal-card .card');
@@ -1216,7 +1344,10 @@ function showDrawReveal(card) {
 
 function hideDrawReveal() {
   const panel = $('drawReveal');
-  if (panel && !panel.classList.contains('hidden')) panel.classList.add('hidden');
+  if (panel) {
+    panel.classList.remove('suspense');
+    if (!panel.classList.contains('hidden')) panel.classList.add('hidden');
+  }
   revealShownFor = null;
 }
 
@@ -1241,11 +1372,18 @@ function showExplodeReveal(p) {
     msg = `${escapeHtml(p.actorName)} drew it!`;
   }
   panel.innerHTML =
-    `<div class="reveal-title">${title}</div>` +
-    `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
-    `<p class="hint">${msg}</p>${btn}`;
+    `<div class="reveal-title" id="revealTitle">Drawing…</div>` +
+    `<div class="reveal-card">${backFaceHTML()}</div>` +
+    `<div class="reveal-foot"><p class="hint">${msg}</p>${btn}</div>`;
   panel.classList.remove('hidden');
   panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
+  Sound.play('draw');
+  runSuspense(panel, card, () => {
+    const t = document.getElementById('revealTitle'); if (t) t.textContent = title;
+    // punch the reveal with a flash (the full death-shake still fires on elimination)
+    const boom = $('boom');
+    if (boom) { boom.classList.remove('on'); void boom.offsetWidth; boom.classList.add('on'); setTimeout(() => boom.classList.remove('on'), 700); }
+  });
   const b = document.getElementById('explodeContinueBtn');
   if (b) b.onclick = () => socket.emit('continueExplode', { code: state.code, playerId: PLAYER_ID }, (res) => { if (!res.ok) toast(res.error, true); });
   const ib = document.getElementById('implodeContinueBtn');
