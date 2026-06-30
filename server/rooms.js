@@ -167,11 +167,15 @@ class RoomManager {
     if (!room.takeoverTimers) room.takeoverTimers = new Map();
     const existing = room.takeoverTimers.get(playerId);
     if (existing) clearTimeout(existing);
+    // Record when the AI will step in, so clients can show a live countdown.
+    const armed = room.players.find((x) => x.id === playerId);
+    if (armed) armed.takeoverAt = Date.now() + SEAT_GRACE_MS;
     const t = setTimeout(() => {
       room.takeoverTimers.delete(playerId);
+      const pl = room.players.find((x) => x.id === playerId);
+      if (pl) pl.takeoverAt = null;       // grace is over either way
       const g = room.game;
       if (!g || g.phase !== 'playing') return;
-      const pl = room.players.find((x) => x.id === playerId);
       if (!pl || pl.connected) return; // they came back in time — leave their seat alone
       const seat = g.playerById(playerId);
       if (seat && !seat.isBot) seat.botControlled = true;
@@ -183,6 +187,8 @@ class RoomManager {
 
   // They reconnected within the window — cancel the pending takeover.
   cancelSeatTakeover(room, playerId) {
+    const pl = room && room.players.find((x) => x.id === playerId);
+    if (pl) pl.takeoverAt = null;
     if (!room || !room.takeoverTimers) return;
     const t = room.takeoverTimers.get(playerId);
     if (t) { clearTimeout(t); room.takeoverTimers.delete(playerId); }

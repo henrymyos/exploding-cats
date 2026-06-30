@@ -37,6 +37,11 @@ class Game {
       hand: [],
       alive: true,
     }));
+    // Per-game tallies for the end-of-game recap screen (purely cosmetic).
+    this.stats = {};
+    this.players.forEach((p) => {
+      this.stats[p.id] = { drawn: 0, played: 0, defused: 0, attacks: 0, kittens: 0, nopes: 0, steals: 0 };
+    });
     this.botMemory = {}; // botId -> { topCardId, topType } from a recent peek
     this.deck = [];
     this.discard = [];
@@ -222,6 +227,32 @@ class Game {
     }
   }
 
+  // Bump a recap counter (no-op if the key/player is unknown).
+  bump(id, key, n = 1) {
+    const s = this.stats && this.stats[id];
+    if (s && key in s) s[key] += n;
+  }
+
+  // Final standings + per-player tallies for the game-over recap. Winner places
+  // 1st; everyone else ranks by how long they lasted (last to die ranks higher).
+  buildRecap() {
+    const place = {};
+    let rank = 1;
+    if (this.winnerId) place[this.winnerId] = rank++;
+    for (let i = this.deadOrder.length - 1; i >= 0; i -= 1) {
+      if (place[this.deadOrder[i]] == null) place[this.deadOrder[i]] = rank++;
+    }
+    for (const p of this.players) if (place[p.id] == null) place[p.id] = rank++;
+    const standings = this.players.map((p) => ({
+      id: p.id,
+      name: p.name,
+      isBot: p.isBot || p.botControlled,
+      place: place[p.id],
+      stats: this.stats[p.id] || {},
+    })).sort((a, b) => a.place - b.place);
+    return { standings };
+  }
+
   // ---------- per-player view (hides other hands & the deck order) ----------
 
   // Kittens a given player should believe could be on top of the draw pile:
@@ -280,6 +311,8 @@ class Game {
       transfer: this.transferFor(playerId),
       lastDiscardBy: this.lastDiscardBy,
       shuffleSeq: this.shuffleSeq,
+      // End-of-game recap: final standings + per-player tallies (only once finished).
+      recap: this.phase === 'finished' ? this.buildRecap() : null,
       log: this.log.slice(-30),
     };
   }

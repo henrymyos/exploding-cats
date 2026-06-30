@@ -87,6 +87,8 @@ Game.prototype.playCards = function playCards(playerId, cardIds, opts = {}) {
     description: this.describeAction(card.type, player, target),
     action: { type: card.type, targetId: target ? target.id : null },
   };
+  this.bump(player.id, 'played');
+  if (card.type === 'ATTACK' || card.type === 'TARGETED_ATTACK') this.bump(player.id, 'attacks');
   return ok({ window: true });
 };
 
@@ -138,6 +140,7 @@ Game.prototype.playCatCombo = function playCatCombo(player, cards, opts) {
         : `${player.name} is demanding a ${opts.namedType} from ${target.name}.`,
     action: { type: 'STEAL', mode, targetId: target.id, namedType: opts.namedType || null },
   };
+  this.bump(player.id, 'played');
   return ok({ window: true });
 };
 
@@ -164,6 +167,7 @@ Game.prototype.playNope = function playNope(playerId) {
   this.pending.nopes.push(playerId);
   this.pending.declined = []; // the chain advanced — everyone gets to decide again
   this.pending.endsAt = Date.now() + NOPE_WINDOW_MS; // reopen the window for a counter-Nope
+  this.bump(playerId, 'nopes');
   const state = this.pending.nopes.length % 2 === 1 ? 'cancelled' : 'back on';
   this.logMsg(`${player.name} played Nope! The action is now ${state}.`);
   return ok({ window: true });
@@ -363,6 +367,7 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
       const [stolen] = target.hand.splice(idx, 1);
       actor.hand.push(stolen);
       this.recordTransfer(stolen, target, actor);
+      this.bump(actor.id, 'steals');
       this.logMsg(`${actor.name} demanded and took a ${stolen.name} from ${target.name}.`);
       this.checkStreakLoss(target);
       this.checkStreakLoss(actor); // grabbing a streaker's live kitten lands it on you
@@ -440,6 +445,7 @@ Game.prototype.stealTake = function stealTake(playerId, index) {
   const [stolen] = target.hand.splice(i, 1);
   actor.hand.push(stolen);
   this.recordTransfer(stolen, target, actor);
+  this.bump(actor.id, 'steals');
   this.logMsg(`${actor.name} swiped a card from ${target.name}.`);
   this.pending = null;
   this.checkStreakLoss(target);
@@ -560,6 +566,8 @@ Game.prototype.resolveDraw = function resolveDraw(player, card, noStreak) {
   // this draw consumes a card, so any standing suspicion about it is settled
   if (this.suspectTopId === card.id) this.suspectTopId = null;
   if (this.defuseWary > 0) this.defuseWary -= 1; // post-defuse caution fades as cards come off
+  this.bump(player.id, 'drawn');
+  if (card.type === 'EXPLODE' || card.type === 'IMPLODE') this.bump(player.id, 'kittens');
 
   // Imploding Kitten: can't be defused. First draw flips it face-up and you put
   // it back; the next person to draw it is gone for good.
@@ -636,6 +644,7 @@ Game.prototype.applyExplode = function applyExplode() {
   if (defuse) {
     this.removeCardFromHand(player, defuse.id);
     this.discard.push(defuse);
+    this.bump(player.id, 'defused');
     this.logMsg(`😼 ${player.name} played a Defuse and survived!`);
     this.pending = {
       kind: 'defuse',
@@ -712,6 +721,7 @@ Game.prototype.checkStreakLoss = function checkStreakLoss(player) {
     this.removeCardFromHand(player, kitten.id);
     const i = Math.floor(Math.random() * (this.deck.length + 1));
     this.deck.splice(this.deck.length - i, 0, kitten); // hide it back in the deck
+    this.bump(player.id, 'defused');
     this.defuseWary = 3;
     this.lastDiscardBy = player.id;
     this.logMsg(`😼 ${player.name} hastily defused a stray Exploding Kitten and slipped it back into the deck.`);
