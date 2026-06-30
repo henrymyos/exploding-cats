@@ -358,6 +358,7 @@ Game.prototype.resolveSteal = function resolveSteal(actor, a) {
       this.recordTransfer(stolen, target, actor);
       this.logMsg(`${actor.name} demanded and took a ${stolen.name} from ${target.name}.`);
       this.checkStreakLoss(target);
+      this.checkStreakLoss(actor); // grabbing a streaker's live kitten lands it on you
     }
   }
 };
@@ -435,6 +436,7 @@ Game.prototype.stealTake = function stealTake(playerId, index) {
   this.logMsg(`${actor.name} swiped a card from ${target.name}.`);
   this.pending = null;
   this.checkStreakLoss(target);
+  this.checkStreakLoss(actor); // a blind grab can land a streaker's live kitten on you
   this.checkWin();
   return ok();
 };
@@ -463,6 +465,7 @@ Game.prototype.favorGive = function favorGive(playerId, cardId) {
   this.logMsg(`${target.name} gave a card to ${actor.name}.`);
   this.pending = null;
   this.checkStreakLoss(target);
+  this.checkStreakLoss(actor); // a begged kitten still explodes its new holder
   this.checkWin();
   return ok();
 };
@@ -695,7 +698,7 @@ Game.prototype.checkStreakLoss = function checkStreakLoss(player) {
     player.alive = false;
     if (!this.deadOrder.includes(player.id)) this.deadOrder.push(player.id);
     this.lastDiscardBy = player.id;
-    this.logMsg(`💥 ${player.name} lost their Streaking Kitten and exploded!`);
+    this.logMsg(`💥 ${player.name} was caught holding an Exploding Kitten with no Streaking Kitten — and exploded!`);
     if (this.currentPlayer() && this.currentPlayer().id === player.id) {
       this.turnsRemaining = 1; this.turnsFromAttack = false; this.nextAlive(this.direction);
     }
