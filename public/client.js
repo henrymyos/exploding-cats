@@ -736,7 +736,7 @@ function hideVictory() {
   victoryShown = false;
 }
 
-/* ---------------- end-of-game recap (this game's standings + stats) ---------------- */
+/* ---------------- end-of-game recap (final standings — medals only) ---------------- */
 function recapHTML(g, lobby) {
   const standings = (g.recap && g.recap.standings) || [];
   if (!standings.length) return '';
@@ -751,44 +751,9 @@ function recapHTML(g, lobby) {
     return `<li class="rc-row${s.place === 1 ? ' win' : ''}">` +
       `<span class="rc-place">${medal(s.place)}</span>${av}` +
       `<span class="rc-name">${escapeHtml(s.name)}${tag}</span>` +
-      `<span class="rc-stats">${statChips(s.stats || {})}</span>` +
     `</li>`;
   }).join('');
-  return `<div class="recap"><h3 class="rc-title">📊 This game</h3><ul class="rc-list">${rows}</ul>${awardsHTML(standings)}</div>`;
-}
-
-function statChips(s) {
-  const out = [];
-  if (s.drawn) out.push(`🎴 ${s.drawn}`);
-  if (s.steals) out.push(`🐾 ${s.steals}`);
-  if (s.defused) out.push(`🧨 ${s.defused}`);
-  if (s.attacks) out.push(`⚔️ ${s.attacks}`);
-  if (s.nopes) out.push(`🚫 ${s.nopes}`);
-  if (s.kittens) out.push(`💥 ${s.kittens}`);
-  return out.map((t) => `<span class="rc-chip">${t}</span>`).join('') || '<span class="rc-chip muted">—</span>';
-}
-
-// A few fun superlatives, shown only when there's a clear non-zero leader.
-function awardsHTML(standings) {
-  const best = (key) => {
-    let top = null;
-    for (const s of standings) {
-      const v = (s.stats && s.stats[key]) || 0;
-      if (v > 0 && (!top || v > top.v)) top = { name: s.name, v };
-    }
-    return top;
-  };
-  const defs = [
-    { key: 'steals', emoji: '🐾', label: 'busiest paws' },
-    { key: 'defused', emoji: '🧨', label: 'cheated death' },
-    { key: 'attacks', emoji: '⚔️', label: 'most aggressive' },
-    { key: 'nopes', emoji: '🚫', label: 'master of NOPE' },
-  ];
-  const chips = defs.map((d) => {
-    const t = best(d.key);
-    return t ? `<span class="rc-award">${d.emoji} <b>${escapeHtml(t.name)}</b> <small>${d.label} (${t.v})</small></span>` : '';
-  }).filter(Boolean);
-  return chips.length ? `<div class="rc-awards">${chips.join('')}</div>` : '';
+  return `<div class="recap"><h3 class="rc-title">Final standings</h3><ul class="rc-list">${rows}</ul></div>`;
 }
 
 /* ---------------- explosion shake ---------------- */
@@ -1299,38 +1264,17 @@ function renderPending(g, me) {
 }
 
 let revealShownFor = null;
-
-// A face-down card back (same look as the draw pile), sized by .reveal-card .card.
-function backFaceHTML() {
-  return `<div class="card card-back-face"></div>`;
-}
-
-// Hold the card face-down for a beat of suspense, then swap in its real face with a
-// quick flip-in and run onReveal. (Content swap — robust across browsers, no 3D.)
-function runSuspense(panel, card, onReveal, hold) {
-  panel.classList.add('suspense');
-  clearTimeout(runSuspense._t);
-  runSuspense._t = setTimeout(() => {
-    panel.classList.remove('suspense');
-    const slot = panel.querySelector('.reveal-card');
-    if (slot) slot.innerHTML = `<div class="card reveal-flip" data-type="${card.type}">${cardFace(card)}</div>`;
-    onReveal();
-  }, hold || 800);
-}
-
 function showDrawReveal(card) {
   const panel = $('drawReveal');
   if (revealShownFor === card.id) return; // already showing this draw
   revealShownFor = card.id;
   panel.innerHTML =
-    `<div class="reveal-title" id="revealTitle">Drawing…</div>` +
-    `<div class="reveal-card">${backFaceHTML()}</div>` +
-    `<div class="reveal-foot"><button class="btn primary" id="drawContinueBtn">Continue → end turn</button></div>`;
+    `<div class="reveal-title">You drew…</div>` +
+    `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
+    `<button class="btn primary" id="drawContinueBtn">Continue → end turn</button>`;
   panel.classList.remove('hidden');
   // small entrance animation
   panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
-  Sound.play('draw');
-  runSuspense(panel, card, () => { const t = document.getElementById('revealTitle'); if (t) t.textContent = 'You drew…'; });
   $('drawContinueBtn').onclick = () => {
     // fly the card from the left panel into your hand
     const cardEl = panel.querySelector('.reveal-card .card');
@@ -1344,10 +1288,7 @@ function showDrawReveal(card) {
 
 function hideDrawReveal() {
   const panel = $('drawReveal');
-  if (panel) {
-    panel.classList.remove('suspense');
-    if (!panel.classList.contains('hidden')) panel.classList.add('hidden');
-  }
+  if (panel && !panel.classList.contains('hidden')) panel.classList.add('hidden');
   revealShownFor = null;
 }
 
@@ -1372,18 +1313,11 @@ function showExplodeReveal(p) {
     msg = `${escapeHtml(p.actorName)} drew it!`;
   }
   panel.innerHTML =
-    `<div class="reveal-title" id="revealTitle">Drawing…</div>` +
-    `<div class="reveal-card">${backFaceHTML()}</div>` +
-    `<div class="reveal-foot"><p class="hint">${msg}</p>${btn}</div>`;
+    `<div class="reveal-title">${title}</div>` +
+    `<div class="reveal-card"><div class="card" data-type="${card.type}">${cardFace(card)}</div></div>` +
+    `<p class="hint">${msg}</p>${btn}`;
   panel.classList.remove('hidden');
   panel.classList.remove('pop'); void panel.offsetWidth; panel.classList.add('pop');
-  Sound.play('draw');
-  runSuspense(panel, card, () => {
-    const t = document.getElementById('revealTitle'); if (t) t.textContent = title;
-    // punch the reveal with a flash (the full death-shake still fires on elimination)
-    const boom = $('boom');
-    if (boom) { boom.classList.remove('on'); void boom.offsetWidth; boom.classList.add('on'); setTimeout(() => boom.classList.remove('on'), 700); }
-  });
   const b = document.getElementById('explodeContinueBtn');
   if (b) b.onclick = () => socket.emit('continueExplode', { code: state.code, playerId: PLAYER_ID }, (res) => { if (!res.ok) toast(res.error, true); });
   const ib = document.getElementById('implodeContinueBtn');

@@ -37,11 +37,6 @@ class Game {
       hand: [],
       alive: true,
     }));
-    // Per-game tallies for the end-of-game recap screen (purely cosmetic).
-    this.stats = {};
-    this.players.forEach((p) => {
-      this.stats[p.id] = { drawn: 0, played: 0, defused: 0, attacks: 0, kittens: 0, nopes: 0, steals: 0 };
-    });
     this.botMemory = {}; // botId -> { topCardId, topType } from a recent peek
     this.deck = [];
     this.discard = [];
@@ -227,14 +222,8 @@ class Game {
     }
   }
 
-  // Bump a recap counter (no-op if the key/player is unknown).
-  bump(id, key, n = 1) {
-    const s = this.stats && this.stats[id];
-    if (s && key in s) s[key] += n;
-  }
-
-  // Final standings + per-player tallies for the game-over recap. Winner places
-  // 1st; everyone else ranks by how long they lasted (last to die ranks higher).
+  // Final standings for the game-over recap. Winner places 1st; everyone else
+  // ranks by how long they lasted (last to die ranks higher).
   buildRecap() {
     const place = {};
     let rank = 1;
@@ -248,7 +237,6 @@ class Game {
       name: p.name,
       isBot: p.isBot || p.botControlled,
       place: place[p.id],
-      stats: this.stats[p.id] || {},
     })).sort((a, b) => a.place - b.place);
     return { standings };
   }
