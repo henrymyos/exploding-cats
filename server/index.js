@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 
 const { RoomManager } = require('./rooms');
 const { catList } = require('./cards');
+const stats = require('./stats');
 
 const app = express();
 const server = http.createServer(app);
@@ -22,6 +23,12 @@ app.get('/api/cats', (_req, res) => {
   res.json(catList());
 });
 
+// All-time family leaderboard across every room and both games.
+app.get('/api/leaderboard', async (_req, res) => {
+  try { res.json(await stats.leaderboard()); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ------------------------------------------------------------------
 // Real-time game wiring
 // ------------------------------------------------------------------
@@ -34,6 +41,7 @@ function broadcast(code) {
     code: room.code,
     hostId: room.hostId,
     started: !!room.game,
+    gameType: room.gameType || 'cats',
     mode: room.mode || 'original',
     expansions: room.expansions || [],
     creatorId: room.creatorId || room.hostId,
@@ -85,6 +93,13 @@ io.on('connection', (socket) => {
     socket.join(room.code);
     ackOk(cb, { code: room.code });
     broadcast(room.code);
+  });
+
+  socket.on('setGameType', ({ code, playerId, type }, cb) => {
+    const { error } = manager.setGameType(code, playerId, type);
+    if (error) return ackErr(cb, error);
+    ackOk(cb);
+    broadcast(code);
   });
 
   socket.on('setMode', ({ code, playerId, mode }, cb) => {
@@ -151,6 +166,17 @@ io.on('connection', (socket) => {
     ackOk(cb, result || {});
     manager.afterMutation(room);
   };
+
+  // ---- Cat Bluff moves ----
+  socket.on('bluffBid', ({ code, playerId, qty, face }, cb) => {
+    withGame(code, (g) => (g.kind === 'bluff' ? g.placeBid(playerId, qty, face) : { ok: false, error: 'Not a dice game.' }), cb);
+  });
+  socket.on('bluffCall', ({ code, playerId }, cb) => {
+    withGame(code, (g) => (g.kind === 'bluff' ? g.callBluff(playerId) : { ok: false, error: 'Not a dice game.' }), cb);
+  });
+  socket.on('bluffContinue', ({ code, playerId }, cb) => {
+    withGame(code, (g) => (g.kind === 'bluff' ? g.continueReveal(playerId) : { ok: false, error: 'Not a dice game.' }), cb);
+  });
 
   socket.on('play', ({ code, playerId, cardIds, targetId, namedType }, cb) => {
     withGame(code, (g) => g.playCards(playerId, cardIds, { targetId, namedType }), cb);

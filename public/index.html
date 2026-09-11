@@ -55,12 +55,19 @@
 
         <p id="homeError" class="error"></p>
       </div>
+
+      <div id="homeLeaderboard" class="home-card leaderboard hidden"></div>
     </section>
 
     <!-- ============ LOBBY ============ -->
     <section id="lobby" class="screen">
       <div class="home-card">
         <h2>Room <span id="lobbyCode" class="code"></span></h2>
+        <div id="gameSelect" class="mode-select game-select">
+          <button class="mode-opt" data-game="cats"><b>🐱 Exploding Cats</b><small>the card game · 2–10</small></button>
+          <button class="mode-opt" data-game="bluff"><b>🎲 Cat Bluff</b><small>liar's dice · 2–10</small></button>
+        </div>
+        <p id="bluffRules" class="hint bluff-rules hidden">Everyone rolls five hidden dice. Bid how many dice on the whole table show a face (1s are wild), raise the bid, or call the last bid a bluff. Whoever's wrong loses a die. Last cat with dice wins.</p>
         <div id="modeSelect" class="mode-select">
           <button class="mode-opt" data-mode="original"><b>Original</b><small>2–5 players · 56 cards</small></button>
           <button class="mode-opt" data-mode="party"><b>Party Pack</b><small>up to 10 · new cards</small></button>
@@ -141,6 +148,26 @@
         <h3>Game log</h3>
         <ul id="logList"></ul>
       </aside>
+    </section>
+
+    <!-- ============ CAT BLUFF TABLE ============ -->
+    <section id="bluff" class="screen bluff-screen">
+      <header class="table-top">
+        <div id="bluffSeats" class="bluff-seats"></div>
+      </header>
+      <main class="table-center bluff-center">
+        <div id="bluffRound" class="bluff-round"></div>
+        <div id="bluffBid" class="bluff-bid"></div>
+        <div id="bluffTurn" class="turn-banner"></div>
+      </main>
+      <footer class="hand-area bluff-hand">
+        <div id="bluffDice" class="bluff-dice"></div>
+        <div id="bluffControls" class="bluff-controls"></div>
+      </footer>
+      <div id="bluffReveal" class="bluff-reveal hidden"></div>
+      <div id="bluffReactBar" class="react-bar"></div>
+      <button id="bluffMenuToggle" class="menu-toggle" title="Game menu">☰</button>
+      <button id="bluffLogToggle" class="log-toggle" title="Game log">📜</button>
     </section>
 
     <!-- ============ OVERLAYS / MODALS ============ -->

@@ -19,7 +19,7 @@ let state = { lobby: null, game: null, code: null };
 let selected = new Set(); // selected card ids in hand
 
 const $ = (id) => document.getElementById(id);
-const screens = { home: $('home'), lobby: $('lobby'), game: $('game') };
+const screens = { home: $('home'), lobby: $('lobby'), game: $('game'), bluff: $('bluff') };
 
 // Keep the game screen exactly as tall as what's actually visible, so the hand's
 // bottom row always hugs the screen edge.
@@ -116,12 +116,14 @@ renderAvatarPicker();
 
 /* ---------------- quick reactions ---------------- */
 const REACT_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];
-(function buildReactBar() {
-  const bar = $('reactBar');
-  if (!bar) return;
-  bar.innerHTML = REACT_EMOJIS.map((e) => `<button class="react-btn">${e}</button>`).join('');
-  bar.querySelectorAll('.react-btn').forEach((b) => {
-    b.onclick = () => socket.emit('react', { code: state.code, playerId: PLAYER_ID, emoji: b.textContent }, () => {});
+(function buildReactBars() {
+  ['reactBar', 'bluffReactBar'].forEach((id) => {
+    const bar = $(id);
+    if (!bar) return;
+    bar.innerHTML = REACT_EMOJIS.map((e) => `<button class="react-btn">${e}</button>`).join('');
+    bar.querySelectorAll('.react-btn').forEach((b) => {
+      b.onclick = () => socket.emit('react', { code: state.code, playerId: PLAYER_ID, emoji: b.textContent }, () => {});
+    });
   });
 }());
 
@@ -189,7 +191,8 @@ socket.on('state', (payload) => {
 function render() {
   const { lobby, game } = state;
   if (!lobby) return showScreen('home');
-  if (game) { renderGame(game, lobby); showScreen('game'); }
+  if (game && game.kind === 'bluff') { renderBluff(game, lobby); showScreen('bluff'); }
+  else if (game) { renderGame(game, lobby); showScreen('game'); }
   else { renderLobby(lobby); showScreen('lobby'); }
   handleReaction(lobby);
 }
@@ -207,7 +210,8 @@ function handleReaction(lobby) {
 function popReaction(r) {
   let anchor = null;
   if (state.game) {
-    anchor = r.playerId === PLAYER_ID ? $('hand') : document.querySelector(`.opp[data-id="${cssId(r.playerId)}"]`);
+    anchor = document.querySelector(`.bseat[data-id="${cssId(r.playerId)}"]`)
+      || (r.playerId === PLAYER_ID ? $('hand') : document.querySelector(`.opp[data-id="${cssId(r.playerId)}"]`));
   } else {
     anchor = document.querySelector(`#lobbyPlayers li[data-id="${cssId(r.playerId)}"]`);
   }
@@ -241,7 +245,24 @@ function renderLobby(lobby) {
   const isHost = lobby.hostId === PLAYER_ID;
   const isCreator = (lobby.creatorId || lobby.hostId) === PLAYER_ID;
   const mode = lobby.mode || 'original';
-  const maxForMode = mode === 'party' ? 10 : 5;
+  const gameType = lobby.gameType || 'cats';
+  const maxForMode = gameType === 'bluff' ? 10 : (mode === 'party' ? 10 : 5);
+  // game picker — creator-only, like the deck
+  const gameBox = $('gameSelect');
+  gameBox.classList.toggle('readonly', !isCreator);
+  gameBox.querySelectorAll('.mode-opt').forEach((b) => {
+    b.classList.toggle('on', b.dataset.game === gameType);
+    b.disabled = !isCreator;
+    b.onclick = isCreator ? () => {
+      socket.emit('setGameType', { code: state.code, playerId: PLAYER_ID, type: b.dataset.game }, (res) => {
+        if (res && !res.ok) toast(res.error, true);
+      });
+    } : null;
+  });
+  // the deck + expansions only apply to the card game
+  $('modeSelect').classList.toggle('hidden', gameType === 'bluff');
+  $('expansionSelect').classList.toggle('hidden', gameType === 'bluff');
+  $('bluffRules').classList.toggle('hidden', gameType !== 'bluff');
   // deck selector: ONLY the game's creator can change it; everyone else sees it
   // as read-only (the chosen deck stays highlighted, but isn't tappable).
   const modeBox = $('modeSelect');
@@ -714,6 +735,7 @@ function showVictory(g, lobby) {
       buttons +
     `</div>`;
   renderScoreboard($('victoryScores'), lobby);
+  setTimeout(loadLeaderboard, 1500); // the server writes the all-time table right after finishing
   Sound.play('victory');
   v.classList.remove('hidden');
 
@@ -1558,9 +1580,10 @@ function goHome() {
   $('logPanel').classList.remove('open');
   lastArcSig = '';    // force the arc to re-lay-out for the next game
   showScreen('home');
+  loadLeaderboard();
 }
 
-$('menuToggle').onclick = () => {
+function openGameMenu() {
   const isHost = state.lobby && state.lobby.hostId === PLAYER_ID;
   openOverlay(
     `<h2>Game menu</h2>` +
@@ -1581,7 +1604,187 @@ $('menuToggle').onclick = () => {
       closeOverlay(); // server broadcasts the room back to the lobby
     });
   };
+}
+$('menuToggle').onclick = openGameMenu;
+$('bluffMenuToggle').onclick = openGameMenu;
+$('bluffLogToggle').onclick = () => $('logPanel').classList.toggle('open');
+
+
+/* ---------------- all-time family leaderboard ---------------- */
+function loadLeaderboard() {
+  fetch('/api/leaderboard').then((r) => r.json()).then(renderLeaderboard).catch(() => {});
+}
+function renderLeaderboard(data) {
+  const box = $('homeLeaderboard');
+  if (!box) return;
+  const rows = (data && data.players) || [];
+  if (!rows.length) { box.classList.add('hidden'); return; }
+  const medal = (i) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`);
+  const per = (e) => ['cats', 'bluff'].map((g) => {
+    const b = e.byGame && e.byGame[g];
+    return b ? `${g === 'cats' ? '🐱' : '🎲'} ${b.wins}/${b.games}` : '';
+  }).filter(Boolean).join(' · ');
+  let html = '<h3 class="sb-title">🏆 All-time family leaderboard</h3><ul class="lb-list">';
+  rows.slice(0, 12).forEach((e, i) => {
+    html += `<li><span class="lb-place">${medal(i)}</span><span class="lb-name">${escapeHtml(e.name)}</span>` +
+      `<span class="lb-games">${per(e)}</span>` +
+      `<span class="lb-wins">${e.wins} <small>win${e.wins === 1 ? '' : 's'} · ${e.winPct}%</small></span></li>`;
+  });
+  html += '</ul>';
+  if (data.recent && data.recent.length) {
+    const r = data.recent[0];
+    html += `<p class="lb-recent">Last game: ${r.game === 'bluff' ? '🎲 Cat Bluff' : '🐱 Exploding Cats'} — ${escapeHtml(r.winner || '?')} won.</p>`;
+  }
+  if (data.persistent === false) html += '<p class="lb-recent">Stored on this server only until a Redis store is connected.</p>';
+  box.innerHTML = html;
+  box.classList.remove('hidden');
+}
+loadLeaderboard();
+
+/* ---------------- Cat Bluff (liar's dice) ---------------- */
+const PIPS = {
+  1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
 };
+function dieHtml(v, cls) {
+  const cells = Array.from({ length: 9 }, (_, i) => `<i${PIPS[v].includes(i) ? ' class="pip"' : ''}></i>`).join('');
+  return `<span class="die${cls ? ' ' + cls : ''}" data-v="${v}" aria-label="${v}">${cells}</span>`;
+}
+let bluffPick = { qty: null, face: null };   // the bid being composed
+let bluffRevealSeq = '';                      // which showdown the overlay is showing
+let bluffTick = null;                         // countdown timer for the reveal
+let bluffRoundSeen = 0;
+
+function minLegalBid(g) {
+  if (!g.bid) return { qty: 1, face: 2 };
+  return g.bid.face < 6 ? { qty: g.bid.qty, face: g.bid.face + 1 } : { qty: g.bid.qty + 1, face: 2 };
+}
+function bidIsLegal(g, qty, face) {
+  if (!(qty >= 1 && face >= 1 && face <= 6) || qty > g.totalDice) return false;
+  if (!g.bid) return true;
+  return qty > g.bid.qty || (qty === g.bid.qty && face > g.bid.face);
+}
+
+function renderBluff(g, lobby) {
+  const me = g.players.find((p) => p.id === PLAYER_ID);
+  const isMyTurn = g.turnPlayerId === PLAYER_ID && g.phase === 'playing' && !g.pending;
+  $('bluff').classList.toggle('my-turn', isMyTurn);
+  const avById = {};
+  (lobby.players || []).forEach((p) => { avById[p.id] = p.avatar; });
+  const byId = {};
+  g.players.forEach((p) => { byId[p.id] = p; });
+
+  // seats
+  $('bluffSeats').innerHTML = g.players.map((p) => {
+    const av = p.isBot ? '🤖' : (avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>` : '😺');
+    const lp = (lobby.players || []).find((x) => x.id === p.id);
+    const gone = lp && !lp.connected && !p.isBot;
+    const cls = ['bseat', p.id === g.turnPlayerId && p.alive ? 'active' : '', p.alive ? '' : 'dead', p.id === PLAYER_ID ? 'me' : '', gone ? 'reconnecting' : ''].filter(Boolean).join(' ');
+    const dice = p.alive ? `<span class="bseat-dice">${'🎲'.repeat(Math.min(p.diceCount, 5))}${p.diceCount > 5 ? '+' : ''}<b>${p.diceCount}</b></span>` : '<span class="bseat-dice out">out</span>';
+    return `<div class="${cls}" data-id="${cssId(p.id)}">${p.id === PLAYER_ID ? '<span class="you-tag">YOU</span>' : ''}` +
+      `<div class="bseat-head">${av}<span class="bseat-name">${escapeHtml(p.name)}</span></div>${dice}</div>`;
+  }).join('');
+
+  // round + bid
+  $('bluffRound').textContent = `Round ${g.round} · ${g.totalDice} dice on the table`;
+  if (g.bid) {
+    const who = g.bid.playerId === PLAYER_ID ? 'You' : escapeHtml(g.bid.name);
+    $('bluffBid').innerHTML = `<div class="bid-label">${who} bid</div><div class="bid-main"><span class="bid-qty">${g.bid.qty} ×</span>${dieHtml(g.bid.face, 'big')}</div>` +
+      `<div class="bid-sub">${g.bid.face === 1 ? 'ones only — no wilds' : 'ones count as wild'}</div>`;
+  } else {
+    $('bluffBid').innerHTML = `<div class="bid-label">No bid yet</div><div class="bid-sub">${g.turnPlayerId === PLAYER_ID ? 'You open the bidding' : escapeHtml((byId[g.turnPlayerId] || {}).name || '') + ' opens the bidding'}</div>`;
+  }
+  const turnEl = $('bluffTurn');
+  if (g.phase === 'finished') turnEl.textContent = '';
+  else if (g.pending) turnEl.textContent = 'Showdown!';
+  else if (isMyTurn) turnEl.textContent = g.bid ? 'Your turn — raise the bid or call bluff' : 'Your turn — open the bidding';
+  else turnEl.textContent = `Waiting for ${escapeHtml((byId[g.turnPlayerId] || {}).name || '…')}…`;
+
+  // my dice
+  const diceBox = $('bluffDice');
+  if (me && me.alive) {
+    diceBox.innerHTML = `<div class="dice-label">Your dice</div><div class="dice-row">${g.myDice.map((v) => dieHtml(v)).join('')}</div>`;
+  } else if (me) {
+    diceBox.innerHTML = '<div class="dice-label">You\'re out of dice — cheer from the sidelines 🍿</div>';
+  } else diceBox.innerHTML = '';
+
+  // controls
+  const ctl = $('bluffControls');
+  if (isMyTurn && me && me.alive) {
+    const min = minLegalBid(g);
+    if (bluffPick.qty == null || bluffRoundSeen !== g.round || !bidIsLegal(g, bluffPick.qty, bluffPick.face)) bluffPick = { ...min };
+    const legal = bidIsLegal(g, bluffPick.qty, bluffPick.face);
+    ctl.innerHTML =
+      `<div class="bid-compose">` +
+        `<div class="qty-step"><button class="btn small" id="qtyDown" ${bluffPick.qty <= 1 ? 'disabled' : ''}>−</button><span class="qty-num">${bluffPick.qty}</span><button class="btn small" id="qtyUp" ${bluffPick.qty >= g.totalDice ? 'disabled' : ''}>+</button></div>` +
+        `<span class="bid-x">×</span>` +
+        `<div class="face-pick">${[1, 2, 3, 4, 5, 6].map((f) => `<button class="face-btn${f === bluffPick.face ? ' on' : ''}" data-f="${f}">${dieHtml(f, 'sm')}</button>`).join('')}</div>` +
+      `</div>` +
+      `<div class="bid-actions">` +
+        `<button class="btn primary" id="bidBtn" ${legal ? '' : 'disabled'}>Bid ${bluffPick.qty} × ${bluffPick.face}</button>` +
+        (g.bid ? `<button class="btn danger" id="callBtn">Call bluff!</button>` : '') +
+      `</div>`;
+    $('qtyDown').onclick = () => { bluffPick.qty = Math.max(1, bluffPick.qty - 1); render(); };
+    $('qtyUp').onclick = () => { bluffPick.qty = Math.min(g.totalDice, bluffPick.qty + 1); render(); };
+    ctl.querySelectorAll('.face-btn').forEach((b) => { b.onclick = () => { bluffPick.face = Number(b.dataset.f); render(); }; });
+    $('bidBtn').onclick = () => {
+      socket.emit('bluffBid', { code: state.code, playerId: PLAYER_ID, qty: bluffPick.qty, face: bluffPick.face }, (res) => {
+        if (res && !res.ok) toast(res.error, true);
+      });
+    };
+    const call = $('callBtn');
+    if (call) call.onclick = () => socket.emit('bluffCall', { code: state.code, playerId: PLAYER_ID }, (res) => { if (res && !res.ok) toast(res.error, true); });
+  } else {
+    ctl.innerHTML = '';
+  }
+  bluffRoundSeen = g.round;
+
+  // showdown overlay
+  renderBluffReveal(g, avById);
+  renderLog(g.log);
+  if (g.phase === 'finished') showVictory(g, lobby);
+  else hideVictory();
+}
+
+function renderBluffReveal(g, avById) {
+  const box = $('bluffReveal');
+  const r = g.reveal;
+  if (!r || !g.pending || g.pending.kind !== 'reveal') {
+    box.classList.add('hidden');
+    if (bluffTick) { clearInterval(bluffTick); bluffTick = null; }
+    bluffRevealSeq = '';
+    return;
+  }
+  const seq = `${g.round}:${r.callerId}:${r.actual}`;
+  if (seq !== bluffRevealSeq) {
+    bluffRevealSeq = seq;
+    const rows = g.players.filter((p) => Array.isArray(p.dice) && (p.alive || p.id === r.loserId)).map((p) => {
+      const av = avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>` : `<span class="avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
+      const dice = (r.dice[p.id] || []).map((v) => dieHtml(v, (v === r.bid.face || (r.bid.face !== 1 && v === 1)) ? 'sm hit' : 'sm')).join('');
+      return `<li class="rv-row${p.id === r.loserId ? ' loser' : ''}">${av}<span class="rv-name">${escapeHtml(p.name)}${p.id === PLAYER_ID ? ' <span class="you-tag inline">YOU</span>' : ''}</span><span class="rv-dice">${dice}</span></li>`;
+    }).join('');
+    const youLose = r.loserId === PLAYER_ID;
+    box.innerHTML =
+      `<div class="rv-box">` +
+        `<h2>${escapeHtml(r.callerName)} called bluff!</h2>` +
+        `<p class="rv-bid">${escapeHtml(r.bidderName)} bid <b>${r.bid.qty} × ${r.bid.face}</b> — the table had <b>${r.actual}</b>. ` +
+          `${r.bidHeld ? 'The bid held.' : 'The bid was a bluff.'}</p>` +
+        `<p class="rv-result${youLose ? ' bad' : ''}">${youLose ? 'You lose a die' : escapeHtml(r.loserName) + ' loses a die'}${r.eliminated ? (youLose ? ' — and you\'re out!' : ' — and is out!') : ''}</p>` +
+        `<ul class="rv-list">${rows}</ul>` +
+        `<button class="btn primary" id="rvNext">Next round <span id="rvCount"></span></button>` +
+      `</div>`;
+    $('rvNext').onclick = () => socket.emit('bluffContinue', { code: state.code, playerId: PLAYER_ID }, () => {});
+    box.classList.remove('hidden');
+    if (bluffTick) clearInterval(bluffTick);
+    const tick = () => {
+      const c = $('rvCount');
+      if (!c) return;
+      const left = Math.max(0, Math.ceil((g.pending.endsAt - Date.now()) / 1000));
+      c.textContent = `(${left})`;
+    };
+    tick();
+    bluffTick = setInterval(tick, 500);
+  }
+}
 
 /* ---------------- log ---------------- */
 $('logToggle').onclick = () => $('logPanel').classList.toggle('open');

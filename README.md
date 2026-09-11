@@ -68,3 +68,18 @@ public/
   client.js   Front-end game client
   assets/cats Your cat photos go here
 ```
+
+## Cat Bluff (second game) and the family leaderboard
+
+The room creator picks the game in the lobby: **Exploding Cats** (the card game) or
+**Cat Bluff**, a liar's-dice game for 2–10. Everyone rolls five hidden dice; players
+raise a bid ("four 3s" = at least four dice on the whole table show a 3, 1s are
+wild) or call the last bid a bluff. Whoever's wrong loses a die; last cat with dice
+wins. Bots play it too. Engine: `server/bluff.js`, bot logic: `server/bluffBrain.js`.
+
+Every finished game with two or more humans is recorded to an **all-time family
+leaderboard** (wins, games, per-game record) shown on the home screen.
+`server/stats.js` stores it in Upstash Redis when `KV_REST_API_URL` /
+`KV_REST_API_TOKEN` (or `UPSTASH_REDIS_REST_URL` / `_TOKEN`) are set — that's what
+keeps it across Render deploys — and otherwise in `data/leaderboard.json`, which is
+wiped on each deploy. Read it at `GET /api/leaderboard`.

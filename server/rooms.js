@@ -1,7 +1,10 @@
 'use strict';
 
 const { Game } = require('./game');
+const { BluffGame } = require('./bluff');
 const brain = require('./botBrain');
+const bluffBrain = require('./bluffBrain');
+const stats = require('./stats');
 const { catList, modeConfig, EXPANSIONS, cleanExpansions } = require('./cards');
 require('./actions'); // augments Game.prototype
 
@@ -12,8 +15,11 @@ const MIN_PLAYERS = 2;
 // (Overridable via env only so tests can use a short window; defaults to 30s.)
 const SEAT_GRACE_MS = Number(process.env.EK_SEAT_GRACE_MS) || 30000;
 
-// Max seats depend on the chosen deck (Original = 5, Party Pack = 10).
+// Max seats depend on the game: Cat Bluff seats 10; the card game depends on
+// the chosen deck (Original = 5, Party Pack = 10).
+const GAME_TYPES = ['cats', 'bluff'];
 function maxPlayers(room) {
+  if (room && room.gameType === 'bluff') return 10;
   return modeConfig(room && room.mode).maxPlayers;
 }
 
@@ -59,6 +65,7 @@ class RoomManager {
       code,
       hostId,
       creatorId: hostId, // the one who made the room — only they may switch decks
+      gameType: 'cats',  // 'cats' (the card game) | 'bluff' (Cat Bluff dice)
       mode: mode === 'party' ? 'party' : 'original',
       expansions: [],    // enabled expansion keys, e.g. ['imploding','zombie']
       players: [{ id: hostId, name: hostName, connected: true, avatar: cleanAvatar(avatar) }],
@@ -71,6 +78,26 @@ class RoomManager {
     };
     this.rooms.set(code, room);
     return room;
+  }
+
+  // Creator picks which game the room plays (Exploding Cats or Cat Bluff).
+  setGameType(code, playerId, type) {
+    const room = this.getRoom(code);
+    if (!room) return { error: 'No room with that code.' };
+    if (room.creatorId !== playerId) return { error: 'Only the game creator can change the game.' };
+    if (room.game) return { error: 'Cannot change the game mid-game.' };
+    if (!GAME_TYPES.includes(type)) return { error: 'Unknown game.' };
+    const before = room.gameType;
+    room.gameType = type;
+    if (room.players.length > maxPlayers(room)) { room.gameType = before; return { error: 'Too many players for that game.' }; }
+    return { room };
+  }
+
+  // Build the right engine for the room's game.
+  makeGame(room) {
+    const seats = room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
+    if (room.gameType === 'bluff') return new BluffGame(seats);
+    return new Game(seats, room.mode, room.expansions);
   }
 
   // Only the room's creator switches the deck (Original / Party Pack) in the lobby.
@@ -238,7 +265,7 @@ class RoomManager {
     if (!room.players.find((p) => p.id === room.hostId)) room.hostId = room.players[0].id;
     if (room.timer) { clearTimeout(room.timer); room.timer = null; }
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
-    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode, room.expansions);
+    room.game = this.makeGame(room);
     this.scheduleResolve(room);
     this.scheduleBots(room);
     return { room };
@@ -286,7 +313,7 @@ class RoomManager {
     if (room.hostId !== playerId) return { error: 'Only the host can start the game.' };
     if (room.game) return { error: 'Game already started.' };
     if (room.players.length < MIN_PLAYERS) return { error: 'Need at least 2 players.' };
-    room.game = new Game(room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot })), room.mode, room.expansions);
+    room.game = this.makeGame(room);
     this.scheduleResolve(room);
     this.scheduleBots(room);
     return { room };
@@ -314,7 +341,8 @@ class RoomManager {
       return;
     }
     const kind = game.pending.kind;
-    if (kind === 'action') game.resolveAction();
+    if (kind === 'reveal') game.finishReveal();          // Cat Bluff showdown timer
+    else if (kind === 'action') game.resolveAction();
     else if (kind === 'future') game.dismissFutureAuto();
     else if (kind === 'favorPick') game.favorAuto();
     else if (kind === 'defuse') game.defuseAuto();
@@ -367,6 +395,9 @@ class RoomManager {
     room.scores[winnerId] = entry;
     if (room.streak && room.streak.id === winnerId) room.streak.count += 1;
     else room.streak = { id: winnerId, name, count: 1 };
+    // All-time family leaderboard (persisted; bots and solo-vs-bot games are skipped).
+    const recap = typeof g.buildRecap === 'function' ? g.buildRecap() : null;
+    if (recap) stats.recordGame({ game: room.gameType || 'cats', standings: recap.standings, roomPlayers: room.players });
   }
 
   // Sorted scoreboard for display.
@@ -386,6 +417,16 @@ class RoomManager {
     const g = room.game;
     if (!g || g.phase !== 'playing') return;
     const p = g.pending;
+
+    if (g.kind === 'bluff') {
+      // Dice game: the only bot decision is on its own turn (bid or call).
+      if (p) return;
+      const cur = g.currentPlayer();
+      if (cur && isBotSeat(cur) && cur.alive) {
+        room.botTimer = setTimeout(() => this.runBotJob(room, 'bluffTurn', cur.id), rand(1100, 2200));
+      }
+      return;
+    }
 
     if (p && p.kind === 'action') {
       // A bot may want to Hiss this action.
@@ -474,6 +515,16 @@ class RoomManager {
     // reclaimed it between scheduling and now, so don't act on their behalf.
     if (!bot || !bot.alive || !isBotSeat(bot)) { this.scheduleBots(room); return; }
     const p = g.pending;
+
+    if (type === 'bluffTurn') {
+      if (!p && g.currentPlayer() && g.currentPlayer().id === botId) {
+        const mv = bluffBrain.chooseMove(g, bot);
+        if (mv.kind === 'call') g.callBluff(botId);
+        else if (!g.placeBid(botId, mv.qty, mv.face).ok) g.callBluff(botId);
+      }
+      this.afterMutation(room);
+      return;
+    }
 
     if (type === 'nope') {
       if (p && p.kind === 'action' && brain.chooseNope(g, bot)) g.playNope(botId);
