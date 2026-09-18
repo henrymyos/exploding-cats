@@ -1,0 +1,26 @@
+name: Keep Render warm
+
+# Render's free tier spins the service down after 15 idle minutes; the next visitor
+# then waits ~50s for a cold start and every in-memory room is gone. Pinging every
+# 10 minutes keeps it awake. (GitHub may delay scheduled runs by a few minutes, and
+# 24/7 uptime of one free service fits inside Render's 750 free hours a month.)
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping the server
+        run: |
+          for i in 1 2 3; do
+            if curl -fsS --max-time 60 https://exploding-cats.onrender.com/api/ping; then
+              echo; exit 0
+            fi
+            echo "attempt $i failed; retrying"; sleep 20
+          done
+          exit 1
