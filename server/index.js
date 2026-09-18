@@ -23,6 +23,14 @@ app.get('/api/cats', (_req, res) => {
   res.json(catList());
 });
 
+// Keep-alive target: the client hits this during play and a scheduled GitHub
+// Action hits it around the clock, so Render's free tier never spins us down
+// (a spin-down takes ~50s to wake and drops every in-memory room).
+app.get('/api/ping', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ ok: true, uptime: Math.round(process.uptime()) });
+});
+
 // All-time family leaderboard across every room and both games.
 app.get('/api/leaderboard', async (_req, res) => {
   try { res.json(await stats.leaderboard()); }

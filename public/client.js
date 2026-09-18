@@ -171,11 +171,23 @@ socket.on('connect', () => {
   if (!code) return;
   // use our saved name so a reconnect never renames us to a generic default
   const name = localStorage.getItem('ec_name') || $('nameInput').value.trim() || 'Player';
+  const hadRoom = !!state.lobby; // we were on a lobby/game screen when the link dropped
   socket.emit('joinRoom', { code, name, playerId: PLAYER_ID, avatar: myAvatar }, (res) => {
-    if (res && res.ok) { state.code = res.code; }
-    else { state.code = null; localStorage.removeItem('ec_code'); render(); } // room is gone
+    if (res && res.ok) { state.code = res.code; return; }
+    // Room is gone. Rooms live in server memory, so this is what a server restart
+    // looks like from the client — say so instead of silently dumping to home.
+    goHome();
+    if (hadRoom) toast('The server restarted and the room was lost. Start a new game.', true);
   });
 });
+
+/* Render's free tier spins the server down after 15 idle minutes and forgets every
+   room. Open sockets don't count as traffic, so while we're in a room send a tiny
+   HTTP request now and then to keep it awake. */
+setInterval(() => {
+  if (!state.code) return;
+  fetch('/api/ping', { cache: 'no-store' }).catch(() => {});
+}, 4 * 60 * 1000);
 
 /* ---------------- state sync ---------------- */
 socket.on('state', (payload) => {
