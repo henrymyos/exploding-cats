@@ -19,7 +19,7 @@ let state = { lobby: null, game: null, code: null };
 let selected = new Set(); // selected card ids in hand
 
 const $ = (id) => document.getElementById(id);
-const screens = { home: $('home'), lobby: $('lobby'), game: $('game'), bluff: $('bluff') };
+const screens = { home: $('home'), lobby: $('lobby'), game: $('game'), bluff: $('bluff'), strays: $('strays') };
 
 // Keep the game screen exactly as tall as what's actually visible, so the hand's
 // bottom row always hugs the screen edge.
@@ -117,7 +117,7 @@ renderAvatarPicker();
 /* ---------------- quick reactions ---------------- */
 const REACT_EMOJIS = ['😹', '😿', '🙀', '😼', '😻', '👏', '💥', '🐱'];
 (function buildReactBars() {
-  ['reactBar', 'bluffReactBar'].forEach((id) => {
+  ['reactBar', 'bluffReactBar', 'straysReactBar'].forEach((id) => {
     const bar = $(id);
     if (!bar) return;
     bar.innerHTML = REACT_EMOJIS.map((e) => `<button class="react-btn">${e}</button>`).join('');
@@ -203,7 +203,8 @@ socket.on('state', (payload) => {
 function render() {
   const { lobby, game } = state;
   if (!lobby) return showScreen('home');
-  if (game && game.kind === 'bluff') { renderBluff(game, lobby); showScreen('bluff'); }
+  if (game && game.kind === 'strays') { renderStrays(game, lobby); showScreen('strays'); }
+  else if (game && game.kind === 'bluff') { renderBluff(game, lobby); showScreen('bluff'); }
   else if (game) { renderGame(game, lobby); showScreen('game'); }
   else { renderLobby(lobby); showScreen('lobby'); }
   handleReaction(lobby);
@@ -258,7 +259,7 @@ function renderLobby(lobby) {
   const isCreator = (lobby.creatorId || lobby.hostId) === PLAYER_ID;
   const mode = lobby.mode || 'original';
   const gameType = lobby.gameType || 'cats';
-  const maxForMode = gameType === 'bluff' ? 10 : (mode === 'party' ? 10 : 5);
+  const maxForMode = gameType !== 'cats' ? 10 : (mode === 'party' ? 10 : 5);
   // game picker — creator-only, like the deck
   const gameBox = $('gameSelect');
   gameBox.classList.toggle('readonly', !isCreator);
@@ -272,9 +273,10 @@ function renderLobby(lobby) {
     } : null;
   });
   // the deck + expansions only apply to the card game
-  $('modeSelect').classList.toggle('hidden', gameType === 'bluff');
-  $('expansionSelect').classList.toggle('hidden', gameType === 'bluff');
+  $('modeSelect').classList.toggle('hidden', gameType !== 'cats');
+  $('expansionSelect').classList.toggle('hidden', gameType !== 'cats');
   $('bluffRules').classList.toggle('hidden', gameType !== 'bluff');
+  $('straysRules').classList.toggle('hidden', gameType !== 'strays');
   // deck selector: ONLY the game's creator can change it; everyone else sees it
   // as read-only (the chosen deck stays highlighted, but isn't tappable).
   const modeBox = $('modeSelect');
@@ -707,7 +709,7 @@ function showVictory(g, lobby) {
   victoryShown = true;
   const v = $('victory');
   const winner = g.players.find((p) => p.id === g.winnerId);
-  const youWon = winner && winner.id === PLAYER_ID;
+  const youWon = g.youWon != null ? g.youWon : (winner && winner.id === PLAYER_ID);
   const isHost = lobby && lobby.hostId === PLAYER_ID;
   const hostName = lobby ? (lobby.players.find((p) => p.id === lobby.hostId) || {}).name : '';
 
@@ -739,8 +741,8 @@ function showVictory(g, lobby) {
     `<div class="victory-box">` +
       `<div class="victory-crown">🏆</div>` +
       crown +
-      `<h1>${youWon ? 'You win!' : escapeHtml((winner && winner.name) || 'Game over')}${youWon || !winner ? '' : ' wins!'}</h1>` +
-      `<div class="victory-sub">last cat standing</div>` +
+      `<h1>${g.victoryTitle ? escapeHtml(g.victoryTitle) : (youWon ? 'You win!' : escapeHtml((winner && winner.name) || 'Game over') + (winner ? ' wins!' : ''))}</h1>` +
+      `<div class="victory-sub">${g.victorySub ? escapeHtml(g.victorySub) : 'last cat standing'}</div>` +
       streakLine +
       recapHTML(g, lobby) +
       `<div id="victoryScores" class="scoreboard"></div>` +
@@ -784,7 +786,7 @@ function recapHTML(g, lobby) {
     const tag = s.id === PLAYER_ID ? '<span class="you-tag">YOU</span>' : (s.isBot ? '<span class="bot-tag">BOT</span>' : '');
     return `<li class="rc-row${s.place === 1 ? ' win' : ''}">` +
       `<span class="rc-place">${medal(s.place)}</span>${av}` +
-      `<span class="rc-name">${escapeHtml(s.name)}${tag}</span>` +
+      `<span class="rc-name">${escapeHtml(s.name)}${tag}${s.role ? ` <small class="rc-role">${roleLabel(s.role)}</small>` : ''}</span>` +
     `</li>`;
   }).join('');
   return `<div class="recap"><h3 class="rc-title">Final standings</h3><ul class="rc-list">${rows}</ul></div>`;
@@ -1626,29 +1628,44 @@ $('bluffLogToggle').onclick = () => $('logPanel').classList.toggle('open');
 function loadLeaderboard() {
   fetch('/api/leaderboard').then((r) => r.json()).then(renderLeaderboard).catch(() => {});
 }
+let lbData = null;
+let lbTab = 'all';   // 'all' | 'month'
+const GAME_ICON = { cats: '🐱', bluff: '🎲', strays: '🐈‍⬛' };
+const GAME_NAME = { cats: 'Exploding Cats', bluff: 'Cat Bluff', strays: 'Stray Cats' };
 function renderLeaderboard(data) {
+  if (data) lbData = data;
+  data = lbData;
   const box = $('homeLeaderboard');
-  if (!box) return;
-  const rows = (data && data.players) || [];
-  if (!rows.length) { box.classList.add('hidden'); return; }
+  if (!box || !data) return;
+  const all = data.players || [];
+  const month = (data.month && data.month.players) || [];
+  if (!all.length) { box.classList.add('hidden'); return; }
+  const rows = lbTab === 'month' ? month : all;
   const medal = (i) => (i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`);
-  const per = (e) => ['cats', 'bluff'].map((g) => {
+  const per = (e) => ['cats', 'bluff', 'strays'].map((g) => {
     const b = e.byGame && e.byGame[g];
-    return b ? `${g === 'cats' ? '🐱' : '🎲'} ${b.wins}/${b.games}` : '';
+    return b ? `${GAME_ICON[g]} ${b.wins}/${b.games}` : '';
   }).filter(Boolean).join(' · ');
-  let html = '<h3 class="sb-title">🏆 All-time family leaderboard</h3><ul class="lb-list">';
-  rows.slice(0, 12).forEach((e, i) => {
-    html += `<li><span class="lb-place">${medal(i)}</span><span class="lb-name">${escapeHtml(e.name)}</span>` +
-      `<span class="lb-games">${per(e)}</span>` +
-      `<span class="lb-wins">${e.wins} <small>win${e.wins === 1 ? '' : 's'} · ${e.winPct}%</small></span></li>`;
-  });
-  html += '</ul>';
+  let html = `<div class="lb-head"><h3 class="sb-title">🏆 Family leaderboard</h3>` +
+    `<div class="lb-tabs"><button class="lb-tab${lbTab === 'all' ? ' on' : ''}" data-tab="all">All-time</button>` +
+    `<button class="lb-tab${lbTab === 'month' ? ' on' : ''}" data-tab="month">${escapeHtml((data.month && data.month.label) || 'This month')}</button></div></div>`;
+  if (!rows.length) html += '<p class="lb-recent">No games yet this month — first win takes the top spot.</p>';
+  else {
+    html += '<ul class="lb-list">';
+    rows.slice(0, 12).forEach((e, i) => {
+      html += `<li><span class="lb-place">${medal(i)}</span><span class="lb-name">${escapeHtml(e.name)}</span>` +
+        `<span class="lb-games">${lbTab === 'month' ? `${e.games} game${e.games === 1 ? '' : 's'}` : per(e)}</span>` +
+        `<span class="lb-wins">${e.wins} <small>win${e.wins === 1 ? '' : 's'} · ${e.winPct}%</small></span></li>`;
+    });
+    html += '</ul>';
+  }
   if (data.recent && data.recent.length) {
     const r = data.recent[0];
-    html += `<p class="lb-recent">Last game: ${r.game === 'bluff' ? '🎲 Cat Bluff' : '🐱 Exploding Cats'} — ${escapeHtml(r.winner || '?')} won.</p>`;
+    html += `<p class="lb-recent">Last game: ${GAME_ICON[r.game] || '🐱'} ${GAME_NAME[r.game] || r.game} — ${escapeHtml(r.winner || '?')} won.</p>`;
   }
   if (data.persistent === false) html += '<p class="lb-recent">Stored on this server only until a Redis store is connected.</p>';
   box.innerHTML = html;
+  box.querySelectorAll('.lb-tab').forEach((b) => { b.onclick = () => { lbTab = b.dataset.tab; renderLeaderboard(); }; });
   box.classList.remove('hidden');
 }
 loadLeaderboard();
@@ -1797,6 +1814,150 @@ function renderBluffReveal(g, avById) {
     bluffTick = setInterval(tick, 500);
   }
 }
+
+/* ---------------- Stray Cats (hidden roles) ---------------- */
+const ROLE_INFO = { stray: ['🐈‍⬛', 'Stray'], vet: ['🩺', 'Vet'], house: ['🐱', 'House Cat'] };
+function roleLabel(role) { return role && ROLE_INFO[role] ? `${ROLE_INFO[role][0]} ${ROLE_INFO[role][1]}` : ''; }
+let straysRevealSeq = '';
+let straysTick = null;
+
+function straysSeatAction(g, p) {
+  if (g.stage === 'night') {
+    if (g.myRole === 'stray' && !g.quietNight) return 'straysPick';
+    if (g.myRole === 'vet' && !g.myPeek) return 'straysPeek';
+    return null;
+  }
+  if (g.stage === 'day') return 'straysVote';
+  return null;
+}
+
+function renderStrays(g, lobby) {
+  const me = g.players.find((p) => p.id === PLAYER_ID);
+  const alive = !!(me && me.alive);
+  const playing = g.phase === 'playing';
+  const avById = {};
+  (lobby.players || []).forEach((p) => { avById[p.id] = p.avatar; });
+  const byId = {};
+  g.players.forEach((p) => { byId[p.id] = p; });
+  const needsMe = alive && playing && (
+    (g.stage === 'night' && ((g.myRole === 'stray' && !g.quietNight && !g.myPick) || (g.myRole === 'vet' && !g.myPeek))) ||
+    (g.stage === 'day' && g.myVote === undefined));
+  const scr = $('strays');
+  scr.classList.toggle('my-turn', needsMe);
+  scr.classList.toggle('night', g.stage === 'night');
+
+  // seats — tap one to pick / check / vote
+  const canTarget = (p) => {
+    if (!alive || !playing || p.id === PLAYER_ID || !p.alive) return false;
+    if (g.stage === 'night') return (g.myRole === 'stray' && !g.quietNight && p.role !== 'stray') || (g.myRole === 'vet' && !g.myPeek);
+    return g.stage === 'day';
+  };
+  const chosen = new Set([g.myPick, g.myPeek, g.myVote].filter(Boolean));
+  $('straysSeats').innerHTML = g.players.map((p) => {
+    const av = p.isBot ? '🤖' : (avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>` : '😺');
+    const lp = (lobby.players || []).find((x) => x.id === p.id);
+    const gone = lp && !lp.connected && !p.isBot;
+    const cls = ['bseat', 'sseat', p.alive ? '' : 'dead', p.id === PLAYER_ID ? 'me' : '', canTarget(p) ? 'target' : '', chosen.has(p.id) ? 'chosen' : '', gone ? 'reconnecting' : ''].filter(Boolean).join(' ');
+    let line;
+    if (!p.alive) line = `<span class="bseat-dice out">out · ${roleLabel(p.role)}</span>`;
+    else if (g.stage === 'day') { const n = (g.tally && g.tally[p.id]) || 0; line = `<span class="bseat-dice">${n ? `${n} vote${n === 1 ? '' : 's'}` : '&nbsp;'}${p.acted ? ' ✓' : ''}</span>`; }
+    else if (p.role && p.id !== PLAYER_ID) line = `<span class="bseat-dice">${roleLabel(p.role)}</span>`;
+    else if (g.vetKnowledge && g.vetKnowledge[p.id]) line = `<span class="bseat-dice">collar: ${ROLE_INFO[g.vetKnowledge[p.id]][1]}</span>`;
+    else line = '<span class="bseat-dice">&nbsp;</span>';
+    return `<div class="${cls}" data-id="${cssId(p.id)}" data-pid="${escapeHtml(p.id)}">${p.id === PLAYER_ID ? '<span class="you-tag">YOU</span>' : ''}` +
+      `<div class="bseat-head">${av}<span class="bseat-name">${escapeHtml(p.name)}</span></div>${line}</div>`;
+  }).join('');
+  $('straysSeats').querySelectorAll('.sseat.target').forEach((el) => {
+    el.onclick = () => {
+      const pid = el.dataset.pid;
+      const ev = straysSeatAction(g, byId[pid]);
+      if (!ev) return;
+      socket.emit(ev, { code: state.code, playerId: PLAYER_ID, targetId: pid }, (res) => { if (res && !res.ok) toast(res.error, true); });
+    };
+  });
+
+  // stage banner + countdown
+  const stageEl = $('straysStage');
+  const count = g.pending && g.pending.endsAt ? ' <span id="straysCount" class="strays-count"></span>' : '';
+  if (!playing) stageEl.innerHTML = '';
+  else if (g.stage === 'night') stageEl.innerHTML = `🌙 Night ${g.round}${g.quietNight ? ' — a quiet night' : ''}${count}`;
+  else if (g.stage === 'day') stageEl.innerHTML = `☀️ Day ${g.round} — vote${count}`;
+  else stageEl.innerHTML = 'Morning report…';
+  if (straysTick) { clearInterval(straysTick); straysTick = null; }
+  if (playing && g.pending && g.pending.endsAt && g.stage !== 'reveal') {
+    const tick = () => { const c = $('straysCount'); if (!c) return; c.textContent = `${Math.max(0, Math.ceil((g.pending.endsAt - Date.now()) / 1000))}s`; };
+    tick(); straysTick = setInterval(tick, 500);
+  }
+  $('straysInfo').textContent = playing ? `${g.players.filter((p) => p.alive).length} cats in the house · ${g.straysAlive} Stray${g.straysAlive === 1 ? '' : 's'} hiding` : '';
+
+  // my role card
+  const roleEl = $('straysRole');
+  if (me) {
+    let extra = '';
+    if (g.myRole === 'stray') {
+      const mates = g.players.filter((p) => p.role === 'stray' && p.id !== PLAYER_ID).map((p) => escapeHtml(p.name));
+      extra = mates.length ? `Your pack: ${mates.join(', ')}` : 'You hunt alone.';
+    } else if (g.myRole === 'vet') {
+      const known = Object.entries(g.vetKnowledge || {}).map(([id, r]) => `${escapeHtml((byId[id] || {}).name || '?')}: ${ROLE_INFO[r][1]}`);
+      extra = known.length ? `Collars checked — ${known.join(' · ')}` : 'Each night you check one cat\'s collar.';
+    } else extra = 'Find the Strays before they take over.';
+    roleEl.innerHTML = `<div class="bid-label">You are</div><div class="strays-role-main">${roleLabel(g.myRole)}</div><div class="bid-sub">${extra}</div>`;
+  } else roleEl.innerHTML = '';
+
+  // hint + controls
+  const ctl = $('straysControls');
+  let hint = '';
+  if (!playing) hint = '';
+  else if (!alive) hint = 'You\'re out — watch from the windowsill 🍿';
+  else if (g.stage === 'night') {
+    if (g.myRole === 'stray') hint = g.quietNight ? 'Quiet night: meet your pack, then wait for morning.' : (g.myPick ? `You picked ${escapeHtml((byId[g.myPick] || {}).name || '')} — tap another cat to change.` : 'Tap a cat to chase off tonight.');
+    else if (g.myRole === 'vet') hint = g.myPeek ? `${escapeHtml((byId[g.myPeek] || {}).name || '')}'s collar: ${ROLE_INFO[g.vetKnowledge[g.myPeek]][1]}` : 'Tap a cat to check its collar.';
+    else hint = 'Sleep tight… the Strays are prowling.';
+  } else if (g.stage === 'day') {
+    hint = g.myVote === undefined ? 'Talk it over, then tap a cat to vote it outside.'
+      : g.myVote === null ? 'You\'re skipping this vote — tap a cat to change.'
+      : `You voted for ${escapeHtml((byId[g.myVote] || {}).name || '')} — tap another cat to change.`;
+  }
+  $('straysHint').innerHTML = hint;
+  if (playing && alive && g.stage === 'day' && g.myVote !== null) {
+    ctl.innerHTML = '<button class="btn" id="straysSkip">Skip vote</button>';
+    $('straysSkip').onclick = () => socket.emit('straysVote', { code: state.code, playerId: PLAYER_ID, targetId: null }, (res) => { if (res && !res.ok) toast(res.error, true); });
+  } else ctl.innerHTML = '';
+
+  renderStraysReveal(g, byId);
+  renderLog(g.log);
+  if (g.phase === 'finished') showVictory(g, lobby);
+  else hideVictory();
+}
+
+function renderStraysReveal(g, byId) {
+  const box = $('straysReveal');
+  const r = g.reveal;
+  if (!r || g.stage !== 'reveal' || g.phase !== 'playing') { box.classList.add('hidden'); straysRevealSeq = ''; return; }
+  const seq = `${r.kind}:${r.round}:${r.victimId || r.outId || '-'}`;
+  if (seq === straysRevealSeq) return;
+  straysRevealSeq = seq;
+  let title, body = '';
+  if (r.kind === 'night') {
+    title = r.quiet ? '🌅 A quiet night' : (r.victimId ? `🌅 ${escapeHtml(r.victimName)} was chased off` : '🌅 Nobody was chased off');
+    body = r.quiet ? '<p class="rv-bid">The Strays met in the dark. The hunt begins tomorrow night.</p>'
+      : r.victimId ? `<p class="rv-result${r.victimId === PLAYER_ID ? ' bad' : ''}">${r.victimId === PLAYER_ID ? 'That was you' : escapeHtml(r.victimName)} — ${roleLabel(r.victimRole)}</p>` : '';
+  } else {
+    title = r.outId ? `🗳️ ${escapeHtml(r.outName)} was sent outside` : '🗳️ Split vote';
+    const rows = Object.entries(r.tally || {}).sort((a, b) => b[1] - a[1]).map(([id, n]) =>
+      `<li class="rv-row${id === r.outId ? ' loser' : ''}"><span class="rv-name">${escapeHtml((byId[id] || {}).name || '?')}</span><span class="rv-dice">${n} vote${n === 1 ? '' : 's'}</span></li>`).join('');
+    body = (r.outId ? `<p class="rv-result${r.outRole === 'stray' ? '' : ' bad'}">${escapeHtml(r.outName)} was ${r.outRole === 'stray' ? 'a Stray! 🎉' : 'a ' + ROLE_INFO[r.outRole][1] + ' 😿'}</p>` : '<p class="rv-bid">Nobody had a clear majority.</p>') +
+      `<ul class="rv-list">${rows}${r.skips ? `<li class="rv-row"><span class="rv-name">Skipped</span><span class="rv-dice">${r.skips}</span></li>` : ''}</ul>`;
+  }
+  box.innerHTML = `<div class="rv-box"><h2>${title}</h2>${body}<button class="btn primary" id="straysNext">Continue <span id="straysNextCount"></span></button></div>`;
+  $('straysNext').onclick = () => socket.emit('straysContinue', { code: state.code, playerId: PLAYER_ID }, () => {});
+  box.classList.remove('hidden');
+  const tick = () => { const c = $('straysNextCount'); if (!c) return; c.textContent = `(${Math.max(0, Math.ceil((g.pending.endsAt - Date.now()) / 1000))})`; };
+  tick();
+  const iv = setInterval(() => { if (!$('straysNextCount')) { clearInterval(iv); return; } tick(); }, 500);
+}
+$('straysMenuToggle').onclick = openGameMenu;
+$('straysLogToggle').onclick = () => $('logPanel').classList.toggle('open');
 
 /* ---------------- log ---------------- */
 $('logToggle').onclick = () => $('logPanel').classList.toggle('open');

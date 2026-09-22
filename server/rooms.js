@@ -2,6 +2,9 @@
 
 const { Game } = require('./game');
 const { BluffGame } = require('./bluff');
+const { StraysGame, MIN_PLAYERS: STRAYS_MIN } = require('./strays');
+const straysBrain = require('./straysBrain');
+const persist = require('./persist');
 const brain = require('./botBrain');
 const bluffBrain = require('./bluffBrain');
 const stats = require('./stats');
@@ -17,9 +20,9 @@ const SEAT_GRACE_MS = Number(process.env.EK_SEAT_GRACE_MS) || 30000;
 
 // Max seats depend on the game: Cat Bluff seats 10; the card game depends on
 // the chosen deck (Original = 5, Party Pack = 10).
-const GAME_TYPES = ['cats', 'bluff'];
+const GAME_TYPES = ['cats', 'bluff', 'strays'];
 function maxPlayers(room) {
-  if (room && room.gameType === 'bluff') return 10;
+  if (room && (room.gameType === 'bluff' || room.gameType === 'strays')) return 10;
   return modeConfig(room && room.mode).maxPlayers;
 }
 
@@ -56,6 +59,42 @@ class RoomManager {
   constructor(broadcast) {
     this.rooms = new Map(); // code -> room
     this.broadcast = broadcast; // (code) => void  (server re-sends snapshots)
+  }
+
+  // Persist every room after any change (debounced; no-op without a KV store).
+  saveRooms() { persist.scheduleSave(this.rooms); }
+
+  // Rebuild rooms saved by a previous process (deploy/restart). Humans start as
+  // disconnected with a grace window — their clients rejoin with the room code
+  // they remember; if they don't come back, the AI takes their seat.
+  restoreRooms(saved) {
+    let n = 0;
+    for (const r of saved) {
+      if (this.rooms.has(r.code)) continue;
+      const room = {
+        code: r.code, hostId: r.hostId, creatorId: r.creatorId || r.hostId,
+        gameType: GAME_TYPES.includes(r.gameType) ? r.gameType : 'cats',
+        mode: r.mode === 'party' ? 'party' : 'original',
+        expansions: cleanExpansions(r.expansions || []),
+        players: (r.players || []).map((p) => ({ id: p.id, name: p.name, isBot: !!p.isBot, avatar: cleanAvatar(p.avatar), connected: !!p.isBot })),
+        game: null, timer: null, scores: r.scores || {}, streak: r.streak || null,
+        reaction: null, reactionSeq: r.reactionSeq || 0,
+      };
+      if (r.game && r.game.data) {
+        const proto = r.game.kind === 'bluff' ? BluffGame.prototype : r.game.kind === 'strays' ? StraysGame.prototype : Game.prototype;
+        const g = Object.assign(Object.create(proto), r.game.data);
+        if (!g.kind || g.kind === 'cats') g.hasExp = (k) => (g.expansions || []).includes(k);
+        room.game = g;
+      }
+      this.rooms.set(room.code, room);
+      if (room.game && room.game.phase === 'playing') {
+        for (const p of room.players) if (!p.isBot) this.scheduleSeatTakeover(room, p.id);
+        this.scheduleResolve(room);
+        this.scheduleBots(room);
+      }
+      n += 1;
+    }
+    return n;
   }
 
   createRoom(hostName, hostId, avatar, mode) {
@@ -97,6 +136,7 @@ class RoomManager {
   makeGame(room) {
     const seats = room.players.map((p) => ({ id: p.id, name: p.name, isBot: p.isBot }));
     if (room.gameType === 'bluff') return new BluffGame(seats);
+    if (room.gameType === 'strays') return new StraysGame(seats);
     return new Game(seats, room.mode, room.expansions);
   }
 
@@ -262,6 +302,7 @@ class RoomManager {
     // keep bots and connected humans; drop anyone who left/disconnected
     room.players = room.players.filter((p) => p.isBot || p.connected);
     if (room.players.length < MIN_PLAYERS) return { error: 'Need at least 2 players to play again.' };
+    if (room.gameType === 'strays' && room.players.length < STRAYS_MIN) return { error: `Stray Cats needs at least ${STRAYS_MIN} cats.` };
     if (!room.players.find((p) => p.id === room.hostId)) room.hostId = room.players[0].id;
     if (room.timer) { clearTimeout(room.timer); room.timer = null; }
     if (room.botTimer) { clearTimeout(room.botTimer); room.botTimer = null; }
@@ -277,6 +318,7 @@ class RoomManager {
     if (room && room.botTimer) clearTimeout(room.botTimer);
     this.clearTakeovers(room);
     this.rooms.delete((code || '').toUpperCase());
+    this.saveRooms();
   }
 
   addBot(code, playerId) {
@@ -313,6 +355,7 @@ class RoomManager {
     if (room.hostId !== playerId) return { error: 'Only the host can start the game.' };
     if (room.game) return { error: 'Game already started.' };
     if (room.players.length < MIN_PLAYERS) return { error: 'Need at least 2 players.' };
+    if (room.gameType === 'strays' && room.players.length < STRAYS_MIN) return { error: `Stray Cats needs at least ${STRAYS_MIN} cats — add a bot or two.` };
     room.game = this.makeGame(room);
     this.scheduleResolve(room);
     this.scheduleBots(room);
@@ -341,7 +384,8 @@ class RoomManager {
       return;
     }
     const kind = game.pending.kind;
-    if (kind === 'reveal') game.finishReveal();          // Cat Bluff showdown timer
+    if (typeof game.onTimer === 'function') game.onTimer(); // Stray Cats: night/day/reveal
+    else if (kind === 'reveal') game.finishReveal();     // Cat Bluff showdown timer
     else if (kind === 'action') game.resolveAction();
     else if (kind === 'future') game.dismissFutureAuto();
     else if (kind === 'favorPick') game.favorAuto();
@@ -417,6 +461,16 @@ class RoomManager {
     const g = room.game;
     if (!g || g.phase !== 'playing') return;
     const p = g.pending;
+
+    if (g.kind === 'strays') {
+      // Hidden roles: one bot at a time acts in the current stage (pick / peek / vote).
+      const due = g.waitingOn().map((id) => g.playerById(id)).filter((b) => b && isBotSeat(b));
+      const bot = due[0];
+      if (!bot) return;
+      const job = g.stage === 'day' ? 'straysVote' : bot.role === 'vet' ? 'straysPeek' : 'straysPick';
+      room.botTimer = setTimeout(() => this.runBotJob(room, job, bot.id), rand(1500, 4500));
+      return;
+    }
 
     if (g.kind === 'bluff') {
       // Dice game: the only bot decision is on its own turn (bid or call).
@@ -515,6 +569,14 @@ class RoomManager {
     // reclaimed it between scheduling and now, so don't act on their behalf.
     if (!bot || !bot.alive || !isBotSeat(bot)) { this.scheduleBots(room); return; }
     const p = g.pending;
+
+    if (type === 'straysPick' || type === 'straysPeek' || type === 'straysVote') {
+      if (type === 'straysPick' && g.stage === 'night') { const t = straysBrain.choosePick(g, bot); if (t) g.pick(botId, t); }
+      if (type === 'straysPeek' && g.stage === 'night') { const t = straysBrain.choosePeek(g, bot); if (t) g.peek(botId, t); }
+      if (type === 'straysVote' && g.stage === 'day') g.vote(botId, straysBrain.chooseVote(g, bot));
+      this.afterMutation(room);
+      return;
+    }
 
     if (type === 'bluffTurn') {
       if (!p && g.currentPlayer() && g.currentPlayer().id === botId) {

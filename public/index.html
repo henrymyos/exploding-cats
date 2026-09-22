@@ -66,7 +66,9 @@
         <div id="gameSelect" class="mode-select game-select">
           <button class="mode-opt" data-game="cats"><b>🐱 Exploding Cats</b><small>the card game · 2–10</small></button>
           <button class="mode-opt" data-game="bluff"><b>🎲 Cat Bluff</b><small>liar's dice · 2–10</small></button>
+          <button class="mode-opt" data-game="strays"><b>🐈‍⬛ Stray Cats</b><small>hidden roles · 4–10</small></button>
         </div>
+        <p id="straysRules" class="hint bluff-rules hidden">A few cats are secretly Strays. Each night the Strays chase one cat off and the Vet secretly checks a collar; each day everyone votes one cat outside. House Cats win when every Stray is found; Strays win when they match the rest. Needs 4+ (bots count).</p>
         <p id="bluffRules" class="hint bluff-rules hidden">Everyone rolls five hidden dice. Bid how many dice on the whole table show a face (1s are wild), raise the bid, or call the last bid a bluff. Whoever's wrong loses a die. Last cat with dice wins.</p>
         <div id="modeSelect" class="mode-select">
           <button class="mode-opt" data-mode="original"><b>Original</b><small>2–5 players · 56 cards</small></button>
@@ -168,6 +170,26 @@
       <div id="bluffReactBar" class="react-bar"></div>
       <button id="bluffMenuToggle" class="menu-toggle" title="Game menu">☰</button>
       <button id="bluffLogToggle" class="log-toggle" title="Game log">📜</button>
+    </section>
+
+    <!-- ============ STRAY CATS TABLE ============ -->
+    <section id="strays" class="screen bluff-screen strays-screen">
+      <header class="table-top">
+        <div id="straysSeats" class="bluff-seats"></div>
+      </header>
+      <main class="table-center bluff-center">
+        <div id="straysStage" class="strays-stage"></div>
+        <div id="straysInfo" class="bluff-round"></div>
+        <div id="straysRole" class="bluff-bid strays-role"></div>
+        <div id="straysHint" class="turn-banner"></div>
+      </main>
+      <footer class="hand-area bluff-hand">
+        <div id="straysControls" class="bluff-controls"></div>
+      </footer>
+      <div id="straysReveal" class="bluff-reveal hidden"></div>
+      <div id="straysReactBar" class="react-bar"></div>
+      <button id="straysMenuToggle" class="menu-toggle" title="Game menu">☰</button>
+      <button id="straysLogToggle" class="log-toggle" title="Game log">📜</button>
     </section>
 
     <!-- ============ OVERLAYS / MODALS ============ -->

@@ -8,6 +8,7 @@ const { Server } = require('socket.io');
 const { RoomManager } = require('./rooms');
 const { catList } = require('./cards');
 const stats = require('./stats');
+const persist = require('./persist');
 
 const app = express();
 const server = http.createServer(app);
@@ -63,6 +64,7 @@ function broadcast(code) {
     if (room.game) payload.game = room.game.snapshotFor(p.id);
     io.to(socketForPlayer(code, p.id)).emit('state', payload);
   }
+  manager.saveRooms();
 }
 
 const manager = new RoomManager(broadcast);
@@ -186,6 +188,13 @@ io.on('connection', (socket) => {
     withGame(code, (g) => (g.kind === 'bluff' ? g.continueReveal(playerId) : { ok: false, error: 'Not a dice game.' }), cb);
   });
 
+  // ---- Stray Cats moves ----
+  const strays = (fn) => (g) => (g.kind === 'strays' ? fn(g) : { ok: false, error: 'Not a Stray Cats game.' });
+  socket.on('straysPick', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.pick(playerId, targetId)), cb); });
+  socket.on('straysPeek', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.peek(playerId, targetId)), cb); });
+  socket.on('straysVote', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.vote(playerId, targetId == null ? null : targetId)), cb); });
+  socket.on('straysContinue', ({ code, playerId }, cb) => { withGame(code, strays((g) => g.continueReveal(playerId)), cb); });
+
   socket.on('play', ({ code, playerId, cardIds, targetId, namedType }, cb) => {
     withGame(code, (g) => g.playCards(playerId, cardIds, { targetId, namedType }), cb);
   });
@@ -285,9 +294,16 @@ io.on('connection', (socket) => {
       broadcast(info.code);
       if (room.game) manager.scheduleBots(room); // keep other bots moving; this seat waits
     }
+    manager.saveRooms();
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`🐱 Exploding Cats running at http://localhost:${PORT}`);
+// Bring back any rooms the previous process had (see persist.js), then listen.
+persist.load().then((saved) => {
+  const n = manager.restoreRooms(saved);
+  if (n) console.log(`♻️  restored ${n} room${n === 1 ? '' : 's'} from the store`);
+}).catch((e) => console.warn('restore failed:', e.message)).finally(() => {
+  server.listen(PORT, () => {
+    console.log(`🐱 Exploding Cats running at http://localhost:${PORT}`);
+  });
 });

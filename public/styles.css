@@ -898,3 +898,22 @@ h1 { font-size: 2rem; margin: 0; }
 
 /* generic hide (the older per-element .x.hidden rules stay as they are) */
 .hidden { display: none !important; }
+
+/* Stray Cats (hidden roles) */
+.game-select { flex-wrap: wrap; }
+.game-select .mode-opt { min-width: 30%; }
+.strays-screen.night { background: radial-gradient(ellipse at top, #0f1a3a 0%, var(--bg) 70%); }
+.strays-stage { font-size: 1.1rem; font-weight: 800; }
+.strays-count { font-weight: 600; color: var(--muted); font-size: .85rem; margin-left: 6px; font-variant-numeric: tabular-nums; }
+.strays-role-main { font-size: 1.5rem; font-weight: 800; margin: 4px 0 2px; }
+.sseat.target { cursor: pointer; border-color: rgba(255,255,255,.25); }
+.sseat.target:hover { border-color: var(--accent2); }
+.sseat.chosen { border-color: var(--accent2); box-shadow: 0 0 14px rgba(255,207,94,.45); }
+.rc-role { color: var(--muted); font-weight: 500; }
+/* leaderboard tabs */
+.lb-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.lb-head .sb-title { margin: 0; }
+.lb-tabs { display: flex; gap: 4px; background: rgba(0,0,0,.2); border-radius: 999px; padding: 3px; }
+.lb-tab { border: none; background: transparent; color: var(--muted); font: inherit; font-size: .75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
+.lb-tab.on { background: var(--panel-light); color: var(--text); }
+.sseat .bseat-dice { letter-spacing: 0; }

@@ -23,6 +23,16 @@ let cache = null;
 let queue = Promise.resolve(); // serialise writes
 
 function nameKey(name) { return (name || '').trim().toLowerCase(); }
+function monthOf(ts) { return new Date(ts).toISOString().slice(0, 7); }   // 'YYYY-MM'
+function bump(months, m, name, won) {
+  const k = nameKey(name);
+  if (!k) return;
+  const bucket = months[m] || (months[m] = {});
+  const e = bucket[k] || (bucket[k] = { name: name.trim(), games: 0, wins: 0 });
+  e.name = name.trim();
+  e.games += 1;
+  if (won) e.wins += 1;
+}
 
 async function redis(cmd) {
   const res = await fetch(URL, {
@@ -51,6 +61,14 @@ async function load() {
   }
   if (!cache.players) cache.players = {};
   if (!cache.history) cache.history = [];
+  // Monthly table, rebuilt from the recent-games history the first time.
+  if (!cache.months) {
+    cache.months = {};
+    for (const h of cache.history) {
+      const m = monthOf(h.ts);
+      for (const name of h.players || []) bump(cache.months, m, name, h.winner === name);
+    }
+  }
   return cache;
 }
 
@@ -65,7 +83,7 @@ async function save(data) {
 
 /*
  * Record one finished game.
- *   game: 'cats' | 'bluff'
+ *   game: 'cats' | 'bluff' | 'strays'
  *   standings: [{ id, name, isBot, place }]  (from Game.buildRecap)
  *   roomPlayers: room.players — used to skip bots and bot-driven abandoned seats
  */
@@ -93,6 +111,7 @@ function recordGame({ game, standings, roomPlayers }) {
       data.players[k] = e;
     }
     const winner = humans.find((s) => s.place === 1) || standings.find((s) => s.place === 1);
+    for (const s of humans) bump(data.months, monthOf(ts), s.name, s.place === 1);
     data.history.unshift({ ts, game, winner: winner ? winner.name : null, players: humans.map((s) => s.name) });
     if (data.history.length > HISTORY_MAX) data.history.length = HISTORY_MAX;
     await save(data);
@@ -105,7 +124,12 @@ async function leaderboard() {
   const rows = Object.values(data.players)
     .map((e) => ({ ...e, winPct: e.games ? Math.round((100 * e.wins) / e.games) : 0 }))
     .sort((a, b) => b.wins - a.wins || b.winPct - a.winPct || b.games - a.games);
-  return { players: rows, recent: data.history.slice(0, 10), persistent: !!(URL && TOKEN) };
+  const key = monthOf(Date.now());
+  const month = Object.values(data.months[key] || {})
+    .map((e) => ({ ...e, winPct: e.games ? Math.round((100 * e.wins) / e.games) : 0 }))
+    .sort((a, b) => b.wins - a.wins || b.winPct - a.winPct || b.games - a.games);
+  const label = new Date(Date.now()).toLocaleString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+  return { players: rows, month: { key, label, players: month }, recent: data.history.slice(0, 10), persistent: !!(URL && TOKEN) };
 }
 
 module.exports = { recordGame, leaderboard };
