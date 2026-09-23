@@ -307,3 +307,14 @@ persist.load().then((saved) => {
     console.log(`🐱 Exploding Cats running at http://localhost:${PORT}`);
   });
 });
+
+// Stay awake on Render's free tier. GitHub's scheduled keep-warm only fires
+// every few hours in practice, so the server pings its own public URL every
+// 10 minutes; the request comes back in through Render's proxy, which counts
+// as traffic. RENDER_EXTERNAL_URL is set by Render (absent locally → no-op).
+const SELF_URL = process.env.RENDER_EXTERNAL_URL;
+if (SELF_URL) {
+  setInterval(() => {
+    fetch(SELF_URL.replace(/\/$/, '') + '/api/ping', { cache: 'no-store' }).catch(() => {});
+  }, 10 * 60 * 1000);
+}

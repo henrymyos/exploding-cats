@@ -1,9 +1,9 @@
 name: Keep Render warm
 
-# Render's free tier spins the service down after 15 idle minutes; the next visitor
-# then waits ~50s for a cold start and every in-memory room is gone. Pinging every
-# 10 minutes keeps it awake. (GitHub may delay scheduled runs by a few minutes, and
-# 24/7 uptime of one free service fits inside Render's 750 free hours a month.)
+# Backup wake-up only. The server pings itself every 10 minutes (server/index.js),
+# which is what actually keeps Render's free instance awake; GitHub throttles this
+# schedule to every few hours on a quiet repo. If the server ever does sleep (e.g.
+# after a deploy with no visitors), this brings it back.
 
 on:
   schedule:
