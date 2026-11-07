@@ -95,7 +95,15 @@ function ackOk(cb, data = {}) {
 }
 
 io.on('connection', (socket) => {
-  socket.on('createRoom', ({ name, playerId, avatar, mode }, cb) => {
+  // Payloads come from any browser, and socket.io runs handlers in process.nextTick,
+  // so one throw (null payload, a number where a string goes) would crash the server.
+  const on = (event, fn) => socket.on(event, (payload, cb) => {
+    if (typeof payload === 'function') [payload, cb] = [{}, payload]; // emit with an ack but no payload
+    try { fn(payload && typeof payload === 'object' ? payload : {}, cb); }
+    catch (e) { console.error(`socket ${event} failed:`, e); ackErr(cb, 'Something went wrong.'); }
+  });
+
+  on('createRoom', ({ name, playerId, avatar, mode }, cb) => {
     if (!name || !playerId) return ackErr(cb, 'Missing name.');
     const room = manager.createRoom(name.trim().slice(0, 16), playerId, avatar, mode);
     socketIndex.set(socket.id, { code: room.code, playerId });
@@ -105,28 +113,28 @@ io.on('connection', (socket) => {
     broadcast(room.code);
   });
 
-  socket.on('setGameType', ({ code, playerId, type }, cb) => {
+  on('setGameType', ({ code, playerId, type }, cb) => {
     const { error } = manager.setGameType(code, playerId, type);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('setMode', ({ code, playerId, mode }, cb) => {
+  on('setMode', ({ code, playerId, mode }, cb) => {
     const { error } = manager.setMode(code, playerId, mode);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('setExpansion', ({ code, playerId, key, on }, cb) => {
+  on('setExpansion', ({ code, playerId, key, on }, cb) => {
     const { error } = manager.setExpansion(code, playerId, key, on);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('joinRoom', ({ code, name, playerId, avatar }, cb) => {
+  on('joinRoom', ({ code, name, playerId, avatar }, cb) => {
     if (!name || !playerId || !code) return ackErr(cb, 'Missing details.');
     const { room, error } = manager.joinRoom(code, name.trim().slice(0, 16), playerId, avatar);
     if (error) return ackErr(cb, error);
@@ -140,27 +148,27 @@ io.on('connection', (socket) => {
     if (room.game) manager.scheduleBots(room);
   });
 
-  socket.on('react', ({ code, playerId, emoji }, cb) => {
+  on('react', ({ code, playerId, emoji }, cb) => {
     manager.react(code, playerId, emoji);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('addBot', ({ code, playerId }, cb) => {
+  on('addBot', ({ code, playerId }, cb) => {
     const { error } = manager.addBot(code, playerId);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('removeBot', ({ code, playerId, botId }, cb) => {
+  on('removeBot', ({ code, playerId, botId }, cb) => {
     const { error } = manager.removeBot(code, playerId, botId);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('startGame', ({ code, playerId }, cb) => {
+  on('startGame', ({ code, playerId }, cb) => {
     const { error } = manager.startGame(code, playerId);
     if (error) return ackErr(cb, error);
     ackOk(cb);
@@ -178,80 +186,80 @@ io.on('connection', (socket) => {
   };
 
   // ---- Cat Bluff moves ----
-  socket.on('bluffBid', ({ code, playerId, qty, face }, cb) => {
+  on('bluffBid', ({ code, playerId, qty, face }, cb) => {
     withGame(code, (g) => (g.kind === 'bluff' ? g.placeBid(playerId, qty, face) : { ok: false, error: 'Not a dice game.' }), cb);
   });
-  socket.on('bluffCall', ({ code, playerId }, cb) => {
+  on('bluffCall', ({ code, playerId }, cb) => {
     withGame(code, (g) => (g.kind === 'bluff' ? g.callBluff(playerId) : { ok: false, error: 'Not a dice game.' }), cb);
   });
-  socket.on('bluffContinue', ({ code, playerId }, cb) => {
+  on('bluffContinue', ({ code, playerId }, cb) => {
     withGame(code, (g) => (g.kind === 'bluff' ? g.continueReveal(playerId) : { ok: false, error: 'Not a dice game.' }), cb);
   });
 
   // ---- Stray Cats moves ----
   const strays = (fn) => (g) => (g.kind === 'strays' ? fn(g) : { ok: false, error: 'Not a Stray Cats game.' });
-  socket.on('straysPick', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.pick(playerId, targetId)), cb); });
-  socket.on('straysPeek', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.peek(playerId, targetId)), cb); });
-  socket.on('straysVote', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.vote(playerId, targetId == null ? null : targetId)), cb); });
-  socket.on('straysContinue', ({ code, playerId }, cb) => { withGame(code, strays((g) => g.continueReveal(playerId)), cb); });
+  on('straysPick', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.pick(playerId, targetId)), cb); });
+  on('straysPeek', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.peek(playerId, targetId)), cb); });
+  on('straysVote', ({ code, playerId, targetId }, cb) => { withGame(code, strays((g) => g.vote(playerId, targetId == null ? null : targetId)), cb); });
+  on('straysContinue', ({ code, playerId }, cb) => { withGame(code, strays((g) => g.continueReveal(playerId)), cb); });
 
-  socket.on('play', ({ code, playerId, cardIds, targetId, namedType }, cb) => {
+  on('play', ({ code, playerId, cardIds, targetId, namedType }, cb) => {
     withGame(code, (g) => g.playCards(playerId, cardIds, { targetId, namedType }), cb);
   });
 
-  socket.on('nope', ({ code, playerId }, cb) => {
+  on('nope', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.playNope(playerId), cb);
   });
 
-  socket.on('declineNope', ({ code, playerId }, cb) => {
+  on('declineNope', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.declineNope(playerId), cb);
   });
 
-  socket.on('draw', ({ code, playerId }, cb) => {
+  on('draw', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.drawCard(playerId), cb);
   });
 
-  socket.on('continueTurn', ({ code, playerId }, cb) => {
+  on('continueTurn', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.continueTurn(playerId), cb);
   });
 
-  socket.on('continueExplode', ({ code, playerId }, cb) => {
+  on('continueExplode', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.resolveExplode(playerId), cb);
   });
 
-  socket.on('favorGive', ({ code, playerId, cardId }, cb) => {
+  on('favorGive', ({ code, playerId, cardId }, cb) => {
     withGame(code, (g) => g.favorGive(playerId, cardId), cb);
   });
 
-  socket.on('stealTake', ({ code, playerId, index }, cb) => {
+  on('stealTake', ({ code, playerId, index }, cb) => {
     withGame(code, (g) => g.stealTake(playerId, index), cb);
   });
 
-  socket.on('markTake', ({ code, playerId, index }, cb) => {
+  on('markTake', ({ code, playerId, index }, cb) => {
     withGame(code, (g) => g.markTake(playerId, index), cb);
   });
 
-  socket.on('defusePlace', ({ code, playerId, index }, cb) => {
+  on('defusePlace', ({ code, playerId, index }, cb) => {
     withGame(code, (g) => g.defusePlace(playerId, index), cb);
   });
 
-  socket.on('implodePlace', ({ code, playerId, index }, cb) => {
+  on('implodePlace', ({ code, playerId, index }, cb) => {
     withGame(code, (g) => g.implodePlace(playerId, index), cb);
   });
 
-  socket.on('continueImplode', ({ code, playerId }, cb) => {
+  on('continueImplode', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.resolveImplode(playerId), cb);
   });
 
-  socket.on('dismissFuture', ({ code, playerId }, cb) => {
+  on('dismissFuture', ({ code, playerId }, cb) => {
     withGame(code, (g) => g.dismissFuture(playerId), cb);
   });
 
-  socket.on('alterFuture', ({ code, playerId, order }, cb) => {
+  on('alterFuture', ({ code, playerId, order }, cb) => {
     withGame(code, (g) => g.alterFuture(playerId, order), cb);
   });
 
-  socket.on('leaveGame', ({ code, playerId }, cb) => {
+  on('leaveGame', ({ code, playerId }, cb) => {
     manager.leaveGame(code, playerId);
     socketIndex.delete(socket.id);
     if (playerSocket.get(playerId) === socket.id) playerSocket.delete(playerId);
@@ -264,14 +272,14 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('endGame', ({ code, playerId }, cb) => {
+  on('endGame', ({ code, playerId }, cb) => {
     const { error } = manager.endGame(code, playerId);
     if (error) return ackErr(cb, error);
     ackOk(cb);
     broadcast(code);
   });
 
-  socket.on('playAgain', ({ code, playerId }, cb) => {
+  on('playAgain', ({ code, playerId }, cb) => {
     const { error } = manager.playAgain(code, playerId);
     if (error) return ackErr(cb, error);
     ackOk(cb);
