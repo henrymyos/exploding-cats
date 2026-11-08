@@ -42,6 +42,12 @@ function randomCode() {
   return s;
 }
 
+// Timer callbacks run with no try/catch around them, so one throw in game or bot
+// code would crash the process and drop every in-memory room. Log it instead.
+function guarded(label, room, fn) {
+  try { fn(); } catch (e) { console.error(`${label} failed in room ${room && room.code}:`, e); }
+}
+
 function rand(min, max) {
   return min + Math.floor(Math.random() * (max - min));
 }
@@ -237,7 +243,7 @@ class RoomManager {
     // Record when the AI will step in, so clients can show a live countdown.
     const armed = room.players.find((x) => x.id === playerId);
     if (armed) armed.takeoverAt = Date.now() + SEAT_GRACE_MS;
-    const t = setTimeout(() => {
+    const t = setTimeout(() => guarded('seat takeover', room, () => {
       room.takeoverTimers.delete(playerId);
       const pl = room.players.find((x) => x.id === playerId);
       if (pl) pl.takeoverAt = null;       // grace is over either way
@@ -248,7 +254,7 @@ class RoomManager {
       if (seat && !seat.isBot) seat.botControlled = true;
       this.broadcast(room.code);
       this.scheduleBots(room);         // the AI now drives the abandoned seat
-    }, SEAT_GRACE_MS);
+    }), SEAT_GRACE_MS);
     room.takeoverTimers.set(playerId, t);
   }
 
@@ -372,7 +378,7 @@ class RoomManager {
     const game = room.game;
     if (!game || !game.pending || !game.pending.endsAt) return;
     const delay = Math.max(0, game.pending.endsAt - Date.now());
-    room.timer = setTimeout(() => this.fireResolve(room), delay + 30);
+    room.timer = setTimeout(() => guarded('resolve', room, () => this.fireResolve(room)), delay + 30);
   }
 
   fireResolve(room) {
@@ -561,6 +567,10 @@ class RoomManager {
   }
 
   runBotJob(room, type, botId) {
+    guarded(`bot ${type}`, room, () => this.botJob(room, type, botId));
+  }
+
+  botJob(room, type, botId) {
     room.botTimer = null;
     const g = room.game;
     if (!g || g.phase !== 'playing') return;
