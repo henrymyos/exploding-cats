@@ -13,7 +13,8 @@ const fs = require('fs');
 const path = require('path');
 
 const KEY = 'cats:leaderboard:v1';
-const FILE = path.join(__dirname, '..', 'data', 'leaderboard.json');
+// STATS_FILE lets tests point the file fallback at a temp file instead of the real board.
+const FILE = process.env.STATS_FILE || path.join(__dirname, '..', 'data', 'leaderboard.json');
 const URL = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || '';
 const TOKEN = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || '';
 const HISTORY_MAX = 100;
