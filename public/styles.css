@@ -772,6 +772,15 @@ h1 { font-size: 2rem; margin: 0; }
 .toast.hidden { display: none; }
 .toast.err { background: var(--danger); }
 
+/* own connection status */
+.conn-banner {
+  position: fixed; top: calc(8px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  z-index: 60; background: var(--panel-light); border: 1px solid var(--accent2);
+  padding: 8px 16px; border-radius: 24px; box-shadow: var(--shadow);
+  font-weight: 600; font-size: .9rem; max-width: 90%; text-align: center; pointer-events: none;
+}
+.conn-banner.hidden { display: none; }
+
 /* card-taken popup — shown to both the taker and the loser */
 .transfer-pop {
   position: fixed; top: 14%; left: 50%; transform: translateX(-50%); z-index: 55;

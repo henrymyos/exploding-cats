@@ -166,6 +166,28 @@ $('startBtn').onclick = () => {
    the app on a phone). socket.io fires 'connect' on every reconnect, so we re-send
    joinRoom whenever we still hold a room code — this is what tells the server our
    seat is human again. Without it the seat stays bot-controlled and we can't play. */
+/* Tell the player when their own link is down. The first connect can take ~a minute
+   while Render wakes the server; a later drop is usually a phone backgrounding the app.
+   socket.io buffers emits and reconnects by itself, so this is only a status line. */
+let everConnected = false;
+let connTimer = null;
+function showConnBanner() {
+  clearTimeout(connTimer);
+  // short grace so a blip or a fast first connect never flashes the banner
+  connTimer = setTimeout(() => {
+    const b = $('connBanner');
+    b.textContent = everConnected ? 'Connection lost. Reconnecting…' : 'Waking up the server… this can take a minute.';
+    b.classList.remove('hidden');
+  }, 1500);
+}
+showConnBanner();
+socket.on('disconnect', showConnBanner);
+socket.on('connect', () => {
+  everConnected = true;
+  clearTimeout(connTimer);
+  $('connBanner').classList.add('hidden');
+});
+
 socket.on('connect', () => {
   const code = state.code || localStorage.getItem('ec_code');
   if (!code) return;
