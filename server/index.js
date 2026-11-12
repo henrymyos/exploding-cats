@@ -17,6 +17,8 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
+// Photos never change in place (new ones get new names), so phones can skip the 32 revalidation requests.
+app.use('/assets', express.static(path.join(PUBLIC_DIR, 'assets'), { maxAge: '7d' }));
 app.use(express.static(PUBLIC_DIR));
 
 // Expose the cat roster so the client can label things without hardcoding.
