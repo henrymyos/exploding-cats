@@ -48,4 +48,9 @@ test('bad socket payloads get an error ack, the server stays up, good ones still
   assert.equal(acks.get(2)?.ok, false, 'no error ack for a non-string name');
   assert.equal(acks.get(4)?.ok, true, 'a valid createRoom was rejected');
   assert.match(acks.get(4).code, /^[A-Z0-9]+$/);
+
+  const photo = await fetch(`${BASE}/assets/cats/max.webp`);
+  assert.equal(photo.status, 200);
+  assert.match(photo.headers.get('cache-control'), /max-age=604800/, 'cat photos should cache for 7 days');
+  assert.match((await fetch(`${BASE}/client.js`)).headers.get('cache-control'), /max-age=0/, 'app code must stay revalidated');
 });
