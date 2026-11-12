@@ -23,7 +23,7 @@ host has to run a persistent Node process rather than short-lived functions.
 
 ## Adding your cats
 
-1. Put 5 square photos in `public/assets/cats/` named `cat1.png` … `cat5.png`.
+1. Put 5 square photos in `public/assets/cats/` named `cat1.webp` … `cat5.webp` (WebP keeps them small; `cwebp -q 82 in.png -o out.webp`).
 2. (Optional) Open `server/cards.js` and change the `name` of each cat in the
    `CATS` array to their real names.
 
