@@ -6,3 +6,6 @@ node_modules/
 npm-debug.log*
 CONTEXT.md
 data/
+
+# Henry's original cat photos: kept locally, not deployed (still in git history)
+source-photos/
