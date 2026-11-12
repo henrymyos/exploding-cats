@@ -77,7 +77,7 @@ function renderAvatarPicker() {
   box.innerHTML = AVATAR_CATS.map((c) => {
     const label = c.charAt(0).toUpperCase() + c.slice(1);
     return `<div class="avatar-choice">` +
-      `<button class="avatar-opt${c === myAvatar ? ' on' : ''}" data-cat="${c}" style="background-image:url('/assets/cats/${c}.png')" title="${label}"></button>` +
+      `<button class="avatar-opt${c === myAvatar ? ' on' : ''}" data-cat="${c}" style="background-image:url('/assets/cats/${c}.webp')" title="${label}"></button>` +
       `<span class="avatar-name">${label}</span>` +
     `</div>`;
   }).join('');
@@ -341,7 +341,7 @@ function renderLobby(lobby) {
 
 // A player's avatar: their chosen cat photo, or an emoji fallback.
 function avatarHtml(p) {
-  if (p && p.avatar) return `<span class="avatar" style="background-image:url('/assets/cats/${p.avatar}.png')"></span>`;
+  if (p && p.avatar) return `<span class="avatar" style="background-image:url('/assets/cats/${p.avatar}.webp')"></span>`;
   return `<span class="avatar emoji">${p && p.isBot ? '🤖' : '😺'}</span>`;
 }
 
@@ -435,7 +435,7 @@ function renderGame(g, lobby) {
     let fan = '';
     for (let i = 0; i < fanCount; i += 1) fan += '<span class="mini-back"></span>';
     const avEl = avById[p.id]
-      ? `<span class="opp-avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>`
+      ? `<span class="opp-avatar" style="background-image:url('/assets/cats/${avById[p.id]}.webp')"></span>`
       : `<span class="opp-avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
     // Mark (Streaking Kittens): a flipped card sits face-up at the TOP of the
     // owner's hand so everyone can see exactly what it is.
@@ -752,7 +752,7 @@ function showVictory(g, lobby) {
 
   const winnerAvatar = lobby && lobby.players ? (lobby.players.find((p) => p.id === g.winnerId) || {}).avatar : null;
   const crown = winnerAvatar
-    ? `<div class="victory-avatar" style="background-image:url('/assets/cats/${winnerAvatar}.png')"></div>`
+    ? `<div class="victory-avatar" style="background-image:url('/assets/cats/${winnerAvatar}.webp')"></div>`
     : `<div class="trophy">🏆</div>`;
   const streak = lobby && lobby.streak;
   const streakLine = streak && streak.id === g.winnerId && streak.count >= 2
@@ -803,7 +803,7 @@ function recapHTML(g, lobby) {
   const medal = (pl) => (pl === 1 ? '🥇' : pl === 2 ? '🥈' : pl === 3 ? '🥉' : `#${pl}`);
   const rows = standings.map((s) => {
     const av = avById[s.id]
-      ? `<span class="rc-av" style="background-image:url('/assets/cats/${avById[s.id]}.png')"></span>`
+      ? `<span class="rc-av" style="background-image:url('/assets/cats/${avById[s.id]}.webp')"></span>`
       : `<span class="rc-av emoji">${s.isBot ? '🤖' : '😺'}</span>`;
     const tag = s.id === PLAYER_ID ? '<span class="you-tag">YOU</span>' : (s.isBot ? '<span class="bot-tag">BOT</span>' : '');
     return `<li class="rc-row${s.place === 1 ? ' win' : ''}">` +
@@ -1726,7 +1726,7 @@ function renderBluff(g, lobby) {
 
   // seats
   $('bluffSeats').innerHTML = g.players.map((p) => {
-    const av = p.isBot ? '🤖' : (avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>` : '😺');
+    const av = p.isBot ? '🤖' : (avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.webp')"></span>` : '😺');
     const lp = (lobby.players || []).find((x) => x.id === p.id);
     const gone = lp && !lp.connected && !p.isBot;
     const cls = ['bseat', p.id === g.turnPlayerId && p.alive ? 'active' : '', p.alive ? '' : 'dead', p.id === PLAYER_ID ? 'me' : '', gone ? 'reconnecting' : ''].filter(Boolean).join(' ');
@@ -1809,7 +1809,7 @@ function renderBluffReveal(g, avById) {
   if (seq !== bluffRevealSeq) {
     bluffRevealSeq = seq;
     const rows = g.players.filter((p) => Array.isArray(p.dice) && (p.alive || p.id === r.loserId)).map((p) => {
-      const av = avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>` : `<span class="avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
+      const av = avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.webp')"></span>` : `<span class="avatar emoji">${p.isBot ? '🤖' : '😺'}</span>`;
       const dice = (r.dice[p.id] || []).map((v) => dieHtml(v, (v === r.bid.face || (r.bid.face !== 1 && v === 1)) ? 'sm hit' : 'sm')).join('');
       return `<li class="rv-row${p.id === r.loserId ? ' loser' : ''}">${av}<span class="rv-name">${escapeHtml(p.name)}${p.id === PLAYER_ID ? ' <span class="you-tag inline">YOU</span>' : ''}</span><span class="rv-dice">${dice}</span></li>`;
     }).join('');
@@ -1876,7 +1876,7 @@ function renderStrays(g, lobby) {
   };
   const chosen = new Set([g.myPick, g.myPeek, g.myVote].filter(Boolean));
   $('straysSeats').innerHTML = g.players.map((p) => {
-    const av = p.isBot ? '🤖' : (avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.png')"></span>` : '😺');
+    const av = p.isBot ? '🤖' : (avById[p.id] ? `<span class="avatar" style="background-image:url('/assets/cats/${avById[p.id]}.webp')"></span>` : '😺');
     const lp = (lobby.players || []).find((x) => x.id === p.id);
     const gone = lp && !lp.connected && !p.isBot;
     const cls = ['bseat', 'sseat', p.alive ? '' : 'dead', p.id === PLAYER_ID ? 'me' : '', canTarget(p) ? 'target' : '', chosen.has(p.id) ? 'chosen' : '', gone ? 'reconnecting' : ''].filter(Boolean).join(' ');
@@ -2094,11 +2094,11 @@ function poseFor(card) {
 
 // Real photos per cat. Cats with several shots rotate poses across card copies.
 const CAT_PHOTOS = {
-  max: ['max.png', 'max2.png', 'max3.png', 'max4.png'],
-  pepper: ['pepper.png', 'pepper2.png', 'pepper3.png'],
-  gambit: ['gambit.png', 'gambit2.png', 'gambit3.png'],
-  loki: ['loki.png', 'loki2.png', 'loki3.png'],
-  genevieve: ['genevieve.png', 'genevieve2.png', 'genevieve3.png'],
+  max: ['max.webp', 'max2.webp', 'max3.webp', 'max4.webp'],
+  pepper: ['pepper.webp', 'pepper2.webp', 'pepper3.webp'],
+  gambit: ['gambit.webp', 'gambit2.webp', 'gambit3.webp'],
+  loki: ['loki.webp', 'loki2.webp', 'loki3.webp'],
+  genevieve: ['genevieve.webp', 'genevieve2.webp', 'genevieve3.webp'],
 };
 
 // Every photo of every cat — used only as a fallback pool.
@@ -2109,36 +2109,36 @@ const ALL_PHOTOS = Object.values(CAT_PHOTOS).reduce((a, list) => a.concat(list),
 // Favor. (The cat types cover every cat photo exactly once.) The Feral Cat — the
 // wild card — is the odd one out: it's backed by photos of Stella the dog.
 const STELLA_PHOTOS = [
-  'stella.png', 'stella2.png', 'stella3.png', 'stella4.png', 'stella5.png',
-  'stella6.png', 'stella7.png', 'stella8.png', 'stella9.png', 'stella10.png',
-  'stella11.png', 'stella12.png', 'stella13.png', 'stella14.png', 'stella15.png',
+  'stella.webp', 'stella2.webp', 'stella3.webp', 'stella4.webp', 'stella5.webp',
+  'stella6.webp', 'stella7.webp', 'stella8.webp', 'stella9.webp', 'stella10.webp',
+  'stella11.webp', 'stella12.webp', 'stella13.webp', 'stella14.webp', 'stella15.webp',
 ];
 const ACTION_PHOTOS = {
-  EXPLODE:  ['gambit.png', 'gambit2.png'],
-  DEFUSE:   ['max.png', 'max2.png'],
-  NOPE:     ['pepper.png', 'pepper2.png'],
-  ATTACK:   ['loki.png', 'loki2.png'],
-  SKIP:     ['genevieve.png', 'genevieve2.png'],
-  FAVOR:    ['max3.png', 'max4.png'],
-  SHUFFLE:  ['pepper3.png', 'gambit3.png'],
-  FUTURE:   ['loki3.png', 'genevieve3.png'],
+  EXPLODE:  ['gambit.webp', 'gambit2.webp'],
+  DEFUSE:   ['max.webp', 'max2.webp'],
+  NOPE:     ['pepper.webp', 'pepper2.webp'],
+  ATTACK:   ['loki.webp', 'loki2.webp'],
+  SKIP:     ['genevieve.webp', 'genevieve2.webp'],
+  FAVOR:    ['max3.webp', 'max4.webp'],
+  SHUFFLE:  ['pepper3.webp', 'gambit3.webp'],
+  FUTURE:   ['loki3.webp', 'genevieve3.webp'],
   // Party Pack types reuse photos thematically (attack-like, future-like, ...).
-  TARGETED_ATTACK: ['loki.png', 'loki2.png'],
-  ALTER:           ['loki3.png', 'genevieve3.png'],
-  DRAW_BOTTOM:     ['pepper3.png', 'gambit3.png'],
+  TARGETED_ATTACK: ['loki.webp', 'loki2.webp'],
+  ALTER:           ['loki3.webp', 'genevieve3.webp'],
+  DRAW_BOTTOM:     ['pepper3.webp', 'gambit3.webp'],
   FERAL:           STELLA_PHOTOS, // the wild card is our dog, Stella
   // Expansion types
-  IMPLODE:         ['gambit.png', 'gambit2.png'],
-  REVERSE:         ['pepper.png', 'pepper2.png'],
-  MARK:            ['max3.png', 'max4.png'],
-  SWAP_TB:         ['pepper3.png', 'gambit3.png'],
-  ZOMBIE:          ['gambit2.png', 'gambit3.png'],
+  IMPLODE:         ['gambit.webp', 'gambit2.webp'],
+  REVERSE:         ['pepper.webp', 'pepper2.webp'],
+  MARK:            ['max3.webp', 'max4.webp'],
+  SWAP_TB:         ['pepper3.webp', 'gambit3.webp'],
+  ZOMBIE:          ['gambit2.webp', 'gambit3.webp'],
 };
 
 function photoFor(card) {
   // Cat cards: a photo OF THAT cat. Action cards: a photo from that type's own set.
   const list = card.type === 'CAT'
-    ? (CAT_PHOTOS[card.cat] || [`${card.cat}.png`])
+    ? (CAT_PHOTOS[card.cat] || [`${card.cat}.webp`])
     : (ACTION_PHOTOS[card.type] || ALL_PHOTOS);
   // hash the card id so each physical card keeps a stable photo, but copies vary
   const s = (card && (card.id || card.type)) || 'x';
