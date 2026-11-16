@@ -17,7 +17,7 @@
 * { box-sizing: border-box; }
 
 /* solid dark canvas so the iPhone safe areas never show as white */
-html { background-color: var(--bg); }
+html { background-color: var(--bg); touch-action: manipulation; } /* pinch-zoom allowed, no double-tap zoom on card taps */
 
 html, body {
   margin: 0;
