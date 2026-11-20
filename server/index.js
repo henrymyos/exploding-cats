@@ -17,6 +17,13 @@ const io = new Server(server);
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, '..', 'public');
 
+// Baseline hardening: no framework fingerprint, no MIME sniffing, no framing by other sites (nothing embeds this game).
+app.disable('x-powered-by');
+app.use((_req, res, next) => {
+  res.set({ 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN' });
+  next();
+});
+
 // Photos never change in place (new ones get new names), so phones can skip the 32 revalidation requests.
 app.use('/assets', express.static(path.join(PUBLIC_DIR, 'assets'), { maxAge: '7d' }));
 app.use(express.static(PUBLIC_DIR));
