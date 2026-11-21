@@ -926,3 +926,14 @@ h1 { font-size: 2rem; margin: 0; }
 .lb-tab { border: none; background: transparent; color: var(--muted); font: inherit; font-size: .75rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; cursor: pointer; }
 .lb-tab.on { background: var(--panel-light); color: var(--text); }
 .sseat .bseat-dice { letter-spacing: 0; }
+
+/* Respect the OS "reduce motion" setting: no screen shakes, bounces or confetti loops. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    animation-delay: 0s !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
