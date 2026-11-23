@@ -58,7 +58,8 @@ async function load() {
     } else cache = empty();
   } catch (e) {
     console.warn('leaderboard load failed:', e.message);
-    cache = empty();
+    // Not cached and flagged, so the next read retries and recordGame never saves this blank board over the real one.
+    return { ...empty(), months: {}, unavailable: true };
   }
   if (!cache.players) cache.players = {};
   if (!cache.history) cache.history = [];
@@ -91,6 +92,7 @@ async function save(data) {
 function recordGame({ game, standings, roomPlayers }) {
   queue = queue.then(async () => {
     const data = await load();
+    if (data.unavailable) throw new Error('store unreadable, game not recorded');
     const humans = standings.filter((s) => {
       const rp = (roomPlayers || []).find((p) => p.id === s.id);
       return !s.isBot && !(rp && rp.isBot);
