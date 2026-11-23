@@ -43,7 +43,6 @@ function serializeRoom(room) {
     scores: room.scores || {},
     streak: room.streak || null,
     reactionSeq: room.reactionSeq || 0,
-    savedAt: Date.now(),
     game: null,
   };
   if (room.game) {
@@ -59,7 +58,7 @@ function serializeRoom(room) {
 
 let timer = null;
 let firstAt = 0;       // when the current debounce window opened
-let lastJson = null;
+let lastKey = null;   // last saved state minus savedAt, so unchanged rooms skip the write
 let queue = Promise.resolve();
 const MAX_WAIT_MS = 1500;   // a busy table can't postpone a save forever
 
@@ -73,10 +72,15 @@ function scheduleSave(rooms) {
     timer = null;
     const list = [];
     for (const room of rooms.values()) list.push(serializeRoom(room));
-    const json = JSON.stringify(list);
-    if (json === lastJson) return;
-    lastJson = json;
-    queue = queue.then(() => redis(['SET', KEY, json])).catch((e) => console.warn('room save failed:', e.message));
+    const key = JSON.stringify(list);
+    if (key === lastKey) return;
+    lastKey = key;
+    const savedAt = Date.now();
+    const json = JSON.stringify(list.map((r) => ({ ...r, savedAt })));
+    queue = queue.then(() => redis(['SET', KEY, json])).catch((e) => {
+      lastKey = null;   // retry on the next change even if the state looks the same
+      console.warn('room save failed:', e.message);
+    });
   }, delay);
 }
 
