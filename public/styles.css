@@ -271,7 +271,6 @@ h1 { font-size: 2rem; margin: 0; }
 /* one of MY OWN cards has been Marked face-up for the table — flag it so I know. */
 .card.marked { box-shadow: 0 0 0 2px var(--accent2), 0 3px 8px rgba(0,0,0,.45); }
 .card.marked::after { content: "🔖"; position: absolute; top: 4px; left: 5px; font-size: 1rem; z-index: 5; filter: drop-shadow(0 1px 2px rgba(0,0,0,.7)); }
-.opp .opp-streak { font-size: .6rem; color: #ff7a6b; font-weight: 700; margin-top: 1px; white-space: nowrap; }
 .opp .opp-avatar { width: 28px; height: 28px; border-radius: 50%; background-size: cover; background-position: center; flex-shrink: 0; border: 2px solid var(--panel-light); }
 .opp .opp-avatar.emoji { font-size: 1.4rem; border: none; background: none; width: auto; height: auto; }
 .opp.active .opp-avatar { border-color: var(--accent2); }
@@ -347,7 +346,6 @@ h1 { font-size: 2rem; margin: 0; }
 .sb-streak { color: #ff8f6b; font-size: .78rem; }
 
 /* sound toggle */
-.sound-toggle { position: fixed; top: 10px; right: 60px; z-index: 30; background: var(--panel); border: none; border-radius: 50%; width: 42px; height: 42px; font-size: 1.1rem; cursor: pointer; color: var(--text); box-shadow: var(--shadow); }
 
 /* quick reactions */
 .react-bar { position: fixed; left: 10px; bottom: 46vh; z-index: 30; display: flex; flex-direction: column; gap: 4px; background: rgba(46,36,82,.85); border-radius: 14px; padding: 6px; box-shadow: var(--shadow); }
@@ -627,7 +625,6 @@ h1 { font-size: 2rem; margin: 0; }
     to { transform: translateX(-50%) scale(1); opacity: 1; }
   }
   /* corner buttons stay small; push the opponents below them so they're not covered */
-  .sound-toggle { right: 58px; width: 38px; height: 38px; }
   .menu-toggle, .log-toggle { width: 38px; height: 38px; }
   .table-top { padding-top: calc(46px + env(safe-area-inset-top)); min-height: 0; flex-shrink: 0; }
   /* compact arc seats: stack avatar over name so each tile is narrow enough that
@@ -716,7 +713,7 @@ h1 { font-size: 2rem; margin: 0; }
 
 /* keep UI clear of the iPhone notch / home indicator when added to home screen */
 @supports (padding: env(safe-area-inset-top)) {
-  .menu-toggle, .sound-toggle, .log-toggle { top: calc(10px + env(safe-area-inset-top)); }
+  .menu-toggle, .log-toggle { top: calc(10px + env(safe-area-inset-top)); }
   .log-panel { padding-top: calc(16px + env(safe-area-inset-top)); }
   .hand-area { padding-bottom: calc(2px + env(safe-area-inset-bottom)); }
   /* Clear the notch on the TOP card only. Applying this to every .home-card put a
